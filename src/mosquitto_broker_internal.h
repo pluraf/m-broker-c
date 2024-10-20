@@ -634,6 +634,9 @@ int config__get_dir_files(const char *include_dir, char ***files, int *file_coun
 
 int drop_privileges(struct mosquitto__config *config);
 
+void config__update_allow_anonymous(struct mosquitto__config *config, bool allow);
+int config__write(struct mosquitto__config *config);
+
 /* ============================================================
  * Server send functions
  * ============================================================ */

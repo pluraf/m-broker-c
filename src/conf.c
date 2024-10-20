@@ -849,7 +849,11 @@ static int config__read_file_core(struct mosquitto__config *config, bool reload,
 					log__printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge support not available.");
 #endif
 				}else if(!strcmp(token, "allow_anonymous")){
-					if(conf__parse_bool(&token, "allow_anonymous", (bool *)&cur_listener->security_options.allow_anonymous, saveptr)) return MOSQ_ERR_INVAL;
+					if(cur_listener == &config->default_listener){
+						if(conf__parse_bool(&token, "allow_anonymous", (bool *)&config->security_options.allow_anonymous, saveptr)) return MOSQ_ERR_INVAL;
+					}else{
+						if(conf__parse_bool(&token, "allow_anonymous", (bool *)&cur_listener->security_options.allow_anonymous, saveptr)) return MOSQ_ERR_INVAL;
+					}
 				}else if(!strcmp(token, "allow_duplicate_messages")){
 					log__printf(NULL, MOSQ_LOG_NOTICE, "The 'allow_duplicate_messages' option is now deprecated and will be removed in a future version. The behaviour will default to true.");
 					if(conf__parse_bool(&token, "allow_duplicate_messages", &config->allow_duplicate_messages, saveptr)) return MOSQ_ERR_INVAL;
@@ -2405,7 +2409,8 @@ static int conf__parse_string(char **token, const char *name, char **value, char
 	return MOSQ_ERR_SUCCESS;
 }
 
-int config__write(struct mosquitto__config *config, const char *file_path) {
+int config__write(struct mosquitto__config *config){
+	const char *file_path = db.config_file;
 	FILE *file = fopen(file_path, "r");
 	if(file == NULL){
 		mosquitto_log_printf(MOSQ_LOG_ERR, "Could not open config file!");
@@ -2459,7 +2464,7 @@ int config__write(struct mosquitto__config *config, const char *file_path) {
 	return 0;
 }
 
-void update_allow_anonymous(struct mosquitto__config *config, bool allow){
+void config__update_allow_anonymous(struct mosquitto__config *config, bool allow){
 	for(int i = 0; i < config->listener_count; i++){
 		if(strcmp(config->listeners[i].host, "127.0.0.1") != 0
 			&& strcmp(config->listeners[i].host, "localhost") != 0){

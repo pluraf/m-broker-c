@@ -64,8 +64,6 @@ void * zmq_listener(void * arg){
     int rc = zmq_bind(responder, "ipc:///tmp/mqbc-zmq.sock");
     if(rc != 0) return NULL;
 
-    struct mosquitto__security_options * opts = &db.config->security_options;
-
     char in_buffer[100];
     char out_buffer[100];
     while(1){
@@ -74,10 +72,11 @@ void * zmq_listener(void * arg){
             break;
         }
         if(num == 0){
-            zmq_send(responder, &opts->allow_anonymous, 1, 0);
+            zmq_send(responder, &db.config->security_options.allow_anonymous, 1, 0);
         }else{
             if(handle_request(in_buffer, out_buffer) != 1){
-                opts->allow_anonymous = in_buffer[0];
+                config__update_allow_anonymous(db.config, in_buffer[0]);
+                config__write(db.config);
             }
             zmq_send(responder, out_buffer, strlen(out_buffer), 0);
         }
