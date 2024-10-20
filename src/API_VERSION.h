@@ -1,0 +1,1 @@
+#define MQBC_API_VERSION "0000"

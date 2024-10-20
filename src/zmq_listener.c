@@ -38,12 +38,24 @@ Contributors:
 #include <pthread.h>
 #include <zmq.h>
 
+#include "API_VERSION.h"
 #undef WITH_BROKER  // FIXME:
 #include "mosquitto_broker_internal.h"
 #include "zmq_listener.h"
 
+
 void * g_context;
 pthread_t g_zmq_th;
+
+
+int handle_request(char * command, char * response){
+    response[0] = 0;
+    if(strcmp(command, "api_version") == 0){
+        strcpy(response, MQBC_API_VERSION);
+        return 1;
+    }
+    return 0;
+}
 
 
 void * zmq_listener(void * arg){
@@ -54,17 +66,20 @@ void * zmq_listener(void * arg){
 
     struct mosquitto__security_options * opts = &db.config->security_options;
 
-    char buffer[100];
+    char in_buffer[100];
+    char out_buffer[100];
     while(1){
-        int num = zmq_recv(responder, buffer, 100, 0);
+        int num = zmq_recv(responder, in_buffer, 100, 0);
         if(num == -1 && zmq_errno() == ETERM){
             break;
         }
         if(num == 0){
             zmq_send(responder, &opts->allow_anonymous, 1, 0);
         }else{
-            zmq_send(responder, NULL, 0, 0);
-            opts->allow_anonymous = buffer[0];
+            if(handle_request(in_buffer, out_buffer) != 1){
+                opts->allow_anonymous = in_buffer[0];
+            }
+            zmq_send(responder, out_buffer, strlen(out_buffer), 0);
         }
     }
     zmq_close(responder);
