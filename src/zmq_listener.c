@@ -54,6 +54,10 @@ int handle_request(char * command, char * response){
         strcpy(response, MQBC_API_VERSION);
         return 1;
     }
+    if(strcmp(command, "status") == 0){
+        strcpy(response, "running");
+        return 1;
+    }
     return 0;
 }
 
@@ -74,6 +78,7 @@ void * zmq_listener(void * arg){
         if(num == 0){
             zmq_send(responder, &db.config->security_options.allow_anonymous, 1, 0);
         }else{
+            in_buffer[num] = '\0';
             if(handle_request(in_buffer, out_buffer) != 1){
                 config__update_allow_anonymous(db.config, in_buffer[0]);
                 config__write(db.config);
