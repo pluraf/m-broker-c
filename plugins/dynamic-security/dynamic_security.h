@@ -136,6 +136,8 @@ struct dynsec__channel{
 	char * text_name;
 	char * text_description;
 	bool disabled;
+	unsigned long msg_received;
+	time_t msg_timestamp;
 };
 
 struct dynsec__group{

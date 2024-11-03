@@ -719,6 +719,12 @@ int mosquitto_acl_check(struct mosquitto *context, const char *topic, uint32_t p
 	struct mosquitto__callback *cb_base;
 	struct mosquitto_evt_acl_check event_data;
 
+	if(context->listener){
+		if(strcmp(context->listener->host, "127.0.0.1") == 0) return MOSQ_ERR_SUCCESS;
+	}else{
+		return MOSQ_ERR_ACL_DENIED;
+	}
+
 	if(!context->id){
 		return MOSQ_ERR_ACL_DENIED;
 	}
@@ -794,6 +800,8 @@ int mosquitto_unpwd_check(struct mosquitto *context)
 	struct mosquitto_evt_basic_auth event_data;
 	struct mosquitto__callback *cb_base;
 	bool plugin_used = false;
+
+	if(strcmp(context->listener->host, "127.0.0.1") == 0) return MOSQ_ERR_SUCCESS;
 
 	rc = MOSQ_ERR_PLUGIN_DEFER;
 

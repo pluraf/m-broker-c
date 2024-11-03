@@ -50,6 +50,7 @@ Contributors:
 
 ******************************************************************************/
 
+#include <time.h>
 
 #include "config.h"
 
@@ -209,10 +210,14 @@ static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check che
 	username = mosquitto_client_username(ed->client);
 	clientid = mosquitto_client_clientid(ed->client);
 
-	// First check connectors assigned to clientid or username
+	// First check channels assigned to clientid or username
 	if(clientid || username){
 		channel = dynsec_channels__find(clientid, username);
 		if(channel != NULL){
+			if(check == acl_check_publish_c_send){
+				++channel->msg_received;
+				channel->msg_timestamp = time(NULL);
+			}
 			rc = check(ed, channel->rolelist);
 			if(rc != MOSQ_ERR_NOT_FOUND){
 				return rc;
@@ -223,10 +228,21 @@ static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check che
 					return rc;
 				}
 			}
+			// Fallback to a defaultACLAccess check
+			if(acl_default_access == false){
+				return MOSQ_ERR_ACL_DENIED;
+			}else{
+				if(!strncmp(ed->topic, "$CONTROL", strlen("$CONTROL"))){
+					/* We never give fall through access to $CONTROL topics, they must
+					* be granted explicitly. */
+					return MOSQ_ERR_ACL_DENIED;
+				}else{
+					return MOSQ_ERR_SUCCESS;
+				}
+			}
 		}
 	}
-
-	// No assigned connectors. Now, we check if public access is available
+	// No assigned channels. Now, we check if public access is available
 	// Check if a special anonymous group is configured
 	if(dynsec_anonymous_group){
 		/* If we have a group for anonymous users, use that for checking. */
@@ -235,18 +251,8 @@ static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check che
 			return rc;
 		}
 	}
-	// Fallback to a defaultACLAccess check
-	if(acl_default_access == false){
-		return MOSQ_ERR_PLUGIN_DEFER;
-	}else{
-		if(!strncmp(ed->topic, "$CONTROL", strlen("$CONTROL"))){
-			/* We never give fall through access to $CONTROL topics, they must
-			 * be granted explicitly. */
-			return MOSQ_ERR_PLUGIN_DEFER;
-		}else{
-			return MOSQ_ERR_SUCCESS;
-		}
-	}
+
+	return MOSQ_ERR_ACL_DENIED;
 }
 
 
@@ -276,16 +282,12 @@ int dynsec__acl_check_callback(int event, void *event_data, void *userdata)
 	switch(ed->access){
 		case MOSQ_ACL_SUBSCRIBE:
 			return acl_check(event_data, acl_check_subscribe, default_access.subscribe);
-			break;
 		case MOSQ_ACL_UNSUBSCRIBE:
 			return acl_check(event_data, acl_check_unsubscribe, default_access.unsubscribe);
-			break;
 		case MOSQ_ACL_WRITE: /* channel to broker */
 			return acl_check(event_data, acl_check_publish_c_send, default_access.publish_c_send);
-			break;
 		case MOSQ_ACL_READ:
 			return acl_check(event_data, acl_check_publish_c_recv, default_access.publish_c_recv);
-			break;
 		default:
 			return MOSQ_ERR_PLUGIN_DEFER;
 	}

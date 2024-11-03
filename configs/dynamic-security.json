@@ -7,10 +7,14 @@
 	},
 	"channels":	[{
 			"chanid":	"ffU2",
-			"authtype":	"Username & Password",
+			"authtype":	"password",
 			"username":	"2",
-			"clientid":	"1",
-			"roles":	[]
+			"roles":	[],
+			"password":	{
+				"hash":	"/sFVjQM8f1gVuZTi62XoMPkUwE9WvR9tqh1hz5kCFSekz1PhEOnvjAPXcjo8HPXMJhMcNQ4OhmPxYaCjZGazWA==",
+				"salt":	"8gr/VN6yxjT3Uh/t",
+				"iterations":	101
+			}
 		}, {
 			"chanid":	"fsd",
 			"authtype":	"JWT_ES256",
