@@ -1,53 +1,90 @@
 {
-	"defaultACLAccess":	{
-		"publishClientSend":	true,
-		"publishClientReceive":	true,
-		"subscribe":	true,
-		"unsubscribe":	true
-	},
-	"channels":	[{
-			"chanid":	"ffU2",
-			"authtype":	"password",
-			"username":	"2",
-			"roles":	[],
-			"password":	{
-				"hash":	"/sFVjQM8f1gVuZTi62XoMPkUwE9WvR9tqh1hz5kCFSekz1PhEOnvjAPXcjo8HPXMJhMcNQ4OhmPxYaCjZGazWA==",
-				"salt":	"8gr/VN6yxjT3Uh/t",
-				"iterations":	101
-			}
-		}, {
-			"chanid":	"fsd",
-			"authtype":	"JWT_ES256",
-			"roles":	[]
-		}, {
-			"chanid":	"test_jwt",
-			"authtype":	"jwt_es256",
-			"username":	"f_2",
-			"roles":	[],
-			"jwtkey":	"-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n-----END PUBLIC KEY-----"
-		}],
-	"groups":	[{
-			"groupname":	"1",
-			"roles":	[{
-					"rolename":	"wer"
-				}],
-			"channels":	[]
-		}],
-	"roles":	[{
-			"rolename":	"admin",
-			"acls":	[{
-					"acltype":	"publishClientSend",
-					"topic":	"$CONTROL/dynamic-security/#",
-					"priority":	0,
-					"allow":	true
-				}]
-		}, {
-			"rolename":	"wer",
-			"acls":	[{
-					"acltype":	"publishClientSend",
-					"topic":	"fsd",
-					"priority":	0,
-					"allow":	true
-				}]
-		}]
+    "defaultACLAccess":	{
+        "publishClientSend":	true,
+        "publishClientReceive":	true,
+        "subscribe":	true,
+        "unsubscribe":	true
+    },
+    "anonymousGroup": "anonymousGroup",
+    "channels":	[{
+            "chanid":	"ffU2",
+            "authtype":	"password",
+            "username":	"2",
+            "roles":	[],
+            "password":	{
+                "hash":	"/sFVjQM8f1gVuZTi62XoMPkUwE9WvR9tqh1hz5kCFSekz1PhEOnvjAPXcjo8HPXMJhMcNQ4OhmPxYaCjZGazWA==",
+                "salt":	"8gr/VN6yxjT3Uh/t",
+                "iterations":	101
+            }
+        }, {
+            "chanid":	"fsd",
+            "authtype":	"JWT_ES256",
+            "roles":	[]
+        }, {
+            "chanid":	"test_jwt",
+            "authtype":	"jwt_es256",
+            "username":	"f_2",
+            "roles":	[],
+            "jwtkey":	"-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n-----END PUBLIC KEY-----"
+        }],
+    "groups": [
+      {
+            "groupname": "1",
+            "roles":	[{
+                    "rolename":	"wer"
+                }],
+            "channels":	[]
+      },
+      {
+        "groupname": "anonymousGroup",
+        "roles": [{"rolename": "anonymousGroup"}]
+      }
+    ],
+    "roles": [{
+            "rolename":	"admin",
+            "acls":	[{
+                    "acltype":	"publishClientSend",
+                    "topic":	"$CONTROL/dynamic-security/#",
+                    "priority":	0,
+                    "allow":	true
+                }]
+        }, {
+            "rolename":	"wer",
+            "acls":	[{
+                    "acltype":	"publishClientSend",
+                    "topic":	"fsd",
+                    "priority":	0,
+                    "allow":	true
+                }]
+        },
+      {
+        "rolename": "anonymousGroup",
+        "acls": [
+          {
+            "acltype": "publishClientSend",
+            "topic": "#",
+            "priority": 0,
+            "allow": true
+          },
+          {
+            "acltype": "publishClientReceive",
+            "topic": "#",
+            "priority": 0,
+            "allow": true
+          },
+          {
+            "acltype": "subscribePattern",
+            "topic": "#",
+            "priority": 0,
+            "allow": true
+          },
+          {
+            "acltype": "unsubscribePattern",
+            "topic": "#",
+            "priority": 0,
+            "allow": true
+          }
+        ]
+      }
+    ]
 }
