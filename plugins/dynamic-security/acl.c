@@ -71,23 +71,23 @@ typedef int (*MOSQ_FUNC_acl_check)(struct mosquitto_evt_acl_check *, struct dyns
 
 static int acl_check_publish_c_recv(struct mosquitto_evt_acl_check *ed, struct dynsec__rolelist *base_rolelist)
 {
-	struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
-	struct dynsec__acl *acl, *acl_tmp = NULL;
-	bool result;
+    struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
+    struct dynsec__acl *acl, *acl_tmp = NULL;
+    bool result;
 
-	HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
-		HASH_ITER(hh, rolelist->role->acls.publish_c_recv, acl, acl_tmp){
-			mosquitto_topic_matches_sub(acl->topic, ed->topic, &result);
-			if(result){
-				if(acl->allow){
-					return MOSQ_ERR_SUCCESS;
-				}else{
-					return MOSQ_ERR_ACL_DENIED;
-				}
-			}
-		}
-	}
-	return MOSQ_ERR_NOT_FOUND;
+    HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
+        HASH_ITER(hh, rolelist->role->acls.publish_c_recv, acl, acl_tmp){
+            mosquitto_topic_matches_sub(acl->topic, ed->topic, &result);
+            if(result){
+                if(acl->allow){
+                    return MOSQ_ERR_SUCCESS;
+                }else{
+                    return MOSQ_ERR_ACL_DENIED;
+                }
+            }
+        }
+    }
+    return MOSQ_ERR_NOT_FOUND;
 }
 
 
@@ -99,23 +99,23 @@ static int acl_check_publish_c_recv(struct mosquitto_evt_acl_check *ed, struct d
 
 static int acl_check_publish_c_send(struct mosquitto_evt_acl_check *ed, struct dynsec__rolelist *base_rolelist)
 {
-	struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
-	struct dynsec__acl *acl, *acl_tmp = NULL;
-	bool result;
+    struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
+    struct dynsec__acl *acl, *acl_tmp = NULL;
+    bool result;
 
-	HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
-		HASH_ITER(hh, rolelist->role->acls.publish_c_send, acl, acl_tmp){
-			mosquitto_topic_matches_sub(acl->topic, ed->topic, &result);
-			if(result){
-				if(acl->allow){
-					return MOSQ_ERR_SUCCESS;
-				}else{
-					return MOSQ_ERR_ACL_DENIED;
-				}
-			}
-		}
-	}
-	return MOSQ_ERR_NOT_FOUND;
+    HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
+        HASH_ITER(hh, rolelist->role->acls.publish_c_send, acl, acl_tmp){
+            mosquitto_topic_matches_sub(acl->topic, ed->topic, &result);
+            if(result){
+                if(acl->allow){
+                    return MOSQ_ERR_SUCCESS;
+                }else{
+                    return MOSQ_ERR_ACL_DENIED;
+                }
+            }
+        }
+    }
+    return MOSQ_ERR_NOT_FOUND;
 }
 
 
@@ -127,32 +127,32 @@ static int acl_check_publish_c_send(struct mosquitto_evt_acl_check *ed, struct d
 
 static int acl_check_subscribe(struct mosquitto_evt_acl_check *ed, struct dynsec__rolelist *base_rolelist)
 {
-	struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
-	struct dynsec__acl *acl, *acl_tmp = NULL;
-	size_t len;
+    struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
+    struct dynsec__acl *acl, *acl_tmp = NULL;
+    size_t len;
 
-	len = strlen(ed->topic);
+    len = strlen(ed->topic);
 
-	HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
-		HASH_FIND(hh, rolelist->role->acls.subscribe_literal, ed->topic, len, acl);
-		if(acl){
-			if(acl->allow){
-				return MOSQ_ERR_SUCCESS;
-			}else{
-				return MOSQ_ERR_ACL_DENIED;
-			}
-		}
-		HASH_ITER(hh, rolelist->role->acls.subscribe_pattern, acl, acl_tmp){
-			if(sub_acl_check(acl->topic, ed->topic)){
-				if(acl->allow){
-					return MOSQ_ERR_SUCCESS;
-				}else{
-					return MOSQ_ERR_ACL_DENIED;
-				}
-			}
-		}
-	}
-	return MOSQ_ERR_NOT_FOUND;
+    HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
+        HASH_FIND(hh, rolelist->role->acls.subscribe_literal, ed->topic, len, acl);
+        if(acl){
+            if(acl->allow){
+                return MOSQ_ERR_SUCCESS;
+            }else{
+                return MOSQ_ERR_ACL_DENIED;
+            }
+        }
+        HASH_ITER(hh, rolelist->role->acls.subscribe_pattern, acl, acl_tmp){
+            if(sub_acl_check(acl->topic, ed->topic)){
+                if(acl->allow){
+                    return MOSQ_ERR_SUCCESS;
+                }else{
+                    return MOSQ_ERR_ACL_DENIED;
+                }
+            }
+        }
+    }
+    return MOSQ_ERR_NOT_FOUND;
 }
 
 
@@ -164,32 +164,32 @@ static int acl_check_subscribe(struct mosquitto_evt_acl_check *ed, struct dynsec
 
 static int acl_check_unsubscribe(struct mosquitto_evt_acl_check *ed, struct dynsec__rolelist *base_rolelist)
 {
-	struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
-	struct dynsec__acl *acl, *acl_tmp = NULL;
-	size_t len;
+    struct dynsec__rolelist *rolelist, *rolelist_tmp = NULL;
+    struct dynsec__acl *acl, *acl_tmp = NULL;
+    size_t len;
 
-	len = strlen(ed->topic);
+    len = strlen(ed->topic);
 
-	HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
-		HASH_FIND(hh, rolelist->role->acls.unsubscribe_literal, ed->topic, len, acl);
-		if(acl){
-			if(acl->allow){
-				return MOSQ_ERR_SUCCESS;
-			}else{
-				return MOSQ_ERR_ACL_DENIED;
-			}
-		}
-		HASH_ITER(hh, rolelist->role->acls.unsubscribe_pattern, acl, acl_tmp){
-			if(sub_acl_check(acl->topic, ed->topic)){
-				if(acl->allow){
-					return MOSQ_ERR_SUCCESS;
-				}else{
-					return MOSQ_ERR_ACL_DENIED;
-				}
-			}
-		}
-	}
-	return MOSQ_ERR_NOT_FOUND;
+    HASH_ITER(hh, base_rolelist, rolelist, rolelist_tmp){
+        HASH_FIND(hh, rolelist->role->acls.unsubscribe_literal, ed->topic, len, acl);
+        if(acl){
+            if(acl->allow){
+                return MOSQ_ERR_SUCCESS;
+            }else{
+                return MOSQ_ERR_ACL_DENIED;
+            }
+        }
+        HASH_ITER(hh, rolelist->role->acls.unsubscribe_pattern, acl, acl_tmp){
+            if(sub_acl_check(acl->topic, ed->topic)){
+                if(acl->allow){
+                    return MOSQ_ERR_SUCCESS;
+                }else{
+                    return MOSQ_ERR_ACL_DENIED;
+                }
+            }
+        }
+    }
+    return MOSQ_ERR_NOT_FOUND;
 }
 
 
@@ -201,56 +201,56 @@ static int acl_check_unsubscribe(struct mosquitto_evt_acl_check *ed, struct dyns
 
 static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check check, bool acl_default_access)
 {
-	struct dynsec__channel * channel;
-	struct dynsec__grouplist *grouplist, *grouplist_tmp = NULL;
-	const char * username;
-	const char * clientid;
-	int rc;
+    struct dynsec__channel * channel;
+    struct dynsec__grouplist *grouplist, *grouplist_tmp = NULL;
+    const char * username;
+    const char * clientid;
+    int rc;
 
-	username = mosquitto_client_username(ed->client);
-	clientid = mosquitto_client_clientid(ed->client);
+    username = mosquitto_client_username(ed->client);
+    clientid = mosquitto_client_clientid(ed->client);
 
-	// First check channels assigned to clientid or username
-	channel = dynsec_channels__find(clientid, username);
-	if(channel != NULL){
-		if(check == acl_check_publish_c_send){
-			++channel->msg_received;
-			channel->msg_timestamp = time(NULL);
-		}
-		rc = check(ed, channel->rolelist);
-		if(rc != MOSQ_ERR_NOT_FOUND){
-			return rc;
-		}
-		HASH_ITER(hh, channel->grouplist, grouplist, grouplist_tmp){
-			rc = check(ed, grouplist->group->rolelist);
-			if(rc != MOSQ_ERR_NOT_FOUND){
-				return rc;
-			}
-		}
-		// Fallback to a defaultACLAccess check
-		if(acl_default_access == false){
-			return MOSQ_ERR_ACL_DENIED;
-		}else{
-			if(!strncmp(ed->topic, "$CONTROL", strlen("$CONTROL"))){
-				/* We never give fall through access to $CONTROL topics, they must
-				* be granted explicitly. */
-				return MOSQ_ERR_ACL_DENIED;
-			}else{
-				return MOSQ_ERR_SUCCESS;
-			}
-		}
-	}
-	// No assigned channels. Now, we check if public access is available
-	// Check if a special anonymous group is configured
-	if(dynsec_anonymous_group){
-		/* If we have a group for anonymous users, use that for checking. */
-		rc = check(ed, dynsec_anonymous_group->rolelist);
-		if(rc != MOSQ_ERR_NOT_FOUND){
-			return rc;
-		}
-	}
+    // First check channels assigned to clientid or username
+    channel = dynsec_channels__find(clientid, username);
+    if(channel != NULL){
+        if(check == acl_check_publish_c_send){
+            ++channel->msg_received;
+            channel->msg_timestamp = time(NULL);
+        }
+        rc = check(ed, channel->rolelist);
+        if(rc != MOSQ_ERR_NOT_FOUND){
+            return rc;
+        }
+        HASH_ITER(hh, channel->grouplist, grouplist, grouplist_tmp){
+            rc = check(ed, grouplist->group->rolelist);
+            if(rc != MOSQ_ERR_NOT_FOUND){
+                return rc;
+            }
+        }
+        // Fallback to a defaultACLAccess check
+        if(acl_default_access == false){
+            return MOSQ_ERR_ACL_DENIED;
+        }else{
+            if(!strncmp(ed->topic, "$CONTROL", strlen("$CONTROL"))){
+                /* We never give fall through access to $CONTROL topics, they must
+                * be granted explicitly. */
+                return MOSQ_ERR_ACL_DENIED;
+            }else{
+                return MOSQ_ERR_SUCCESS;
+            }
+        }
+    }
+    // No assigned channels. Now, we check if public access is available
+    // Check if a special anonymous group is configured
+    if(dynsec_anonymous_group){
+        /* If we have a group for anonymous users, use that for checking. */
+        rc = check(ed, dynsec_anonymous_group->rolelist);
+        if(rc != MOSQ_ERR_NOT_FOUND){
+            return rc;
+        }
+    }
 
-	return MOSQ_ERR_ACL_DENIED;
+    return MOSQ_ERR_ACL_DENIED;
 }
 
 
@@ -262,32 +262,32 @@ static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check che
 
 int dynsec__acl_check_callback(int event, void *event_data, void *userdata)
 {
-	struct mosquitto_evt_acl_check *ed = event_data;
+    struct mosquitto_evt_acl_check *ed = event_data;
 
-	UNUSED(event);
-	UNUSED(userdata);
+    UNUSED(event);
+    UNUSED(userdata);
 
-	/* ACL checks are made in the order below until a match occurs, at which
-	 * point the decision is made.
-	 *
-	 * User roles in priority order highest to lowest.
-	 *    Roles have their ACLs checked in priority order, highest to lowest
-	 * Groups are processed in priority order highest to lowest
-	 *    Group roles are processed in priority order, highest to lowest
-	 *       Roles have their ACLs checked in priority order, highest to lowest
-	 */
+    /* ACL checks are made in the order below until a match occurs, at which
+     * point the decision is made.
+     *
+     * User roles in priority order highest to lowest.
+     *    Roles have their ACLs checked in priority order, highest to lowest
+     * Groups are processed in priority order highest to lowest
+     *    Group roles are processed in priority order, highest to lowest
+     *       Roles have their ACLs checked in priority order, highest to lowest
+     */
 
-	switch(ed->access){
-		case MOSQ_ACL_SUBSCRIBE:
-			return acl_check(event_data, acl_check_subscribe, default_access.subscribe);
-		case MOSQ_ACL_UNSUBSCRIBE:
-			return acl_check(event_data, acl_check_unsubscribe, default_access.unsubscribe);
-		case MOSQ_ACL_WRITE: /* channel to broker */
-			return acl_check(event_data, acl_check_publish_c_send, default_access.publish_c_send);
-		case MOSQ_ACL_READ:
-			return acl_check(event_data, acl_check_publish_c_recv, default_access.publish_c_recv);
-		default:
-			return MOSQ_ERR_PLUGIN_DEFER;
-	}
-	return MOSQ_ERR_PLUGIN_DEFER;
+    switch(ed->access){
+        case MOSQ_ACL_SUBSCRIBE:
+            return acl_check(event_data, acl_check_subscribe, default_access.subscribe);
+        case MOSQ_ACL_UNSUBSCRIBE:
+            return acl_check(event_data, acl_check_unsubscribe, default_access.unsubscribe);
+        case MOSQ_ACL_WRITE: /* channel to broker */
+            return acl_check(event_data, acl_check_publish_c_send, default_access.publish_c_send);
+        case MOSQ_ACL_READ:
+            return acl_check(event_data, acl_check_publish_c_recv, default_access.publish_c_recv);
+        default:
+            return MOSQ_ERR_PLUGIN_DEFER;
+    }
+    return MOSQ_ERR_PLUGIN_DEFER;
 }

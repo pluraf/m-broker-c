@@ -21,25 +21,25 @@ Contributors:
 
 void *mosquitto_calloc(size_t nmemb, size_t size)
 {
-	return mosquitto__calloc(nmemb, size);
+    return mosquitto__calloc(nmemb, size);
 }
 
 void mosquitto_free(void *mem)
 {
-	mosquitto__free(mem);
+    mosquitto__free(mem);
 }
 
 void *mosquitto_malloc(size_t size)
 {
-	return mosquitto__malloc(size);
+    return mosquitto__malloc(size);
 }
 
 void *mosquitto_realloc(void *ptr, size_t size)
 {
-	return mosquitto__realloc(ptr, size);
+    return mosquitto__realloc(ptr, size);
 }
 
 char *mosquitto_strdup(const char *s)
 {
-	return mosquitto__strdup(s);
+    return mosquitto__strdup(s);
 }

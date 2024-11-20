@@ -34,75 +34,75 @@ Contributors:
 
 int handle__packet(struct mosquitto *context)
 {
-	int rc = MOSQ_ERR_INVAL;
+    int rc = MOSQ_ERR_INVAL;
 
-	if(!context) return MOSQ_ERR_INVAL;
+    if(!context) return MOSQ_ERR_INVAL;
 
-	switch((context->in_packet.command)&0xF0){
-		case CMD_PINGREQ:
-			rc = handle__pingreq(context);
-			break;
-		case CMD_PINGRESP:
-			rc = handle__pingresp(context);
-			break;
-		case CMD_PUBACK:
-			rc = handle__pubackcomp(context, "PUBACK");
-			break;
-		case CMD_PUBCOMP:
-			rc = handle__pubackcomp(context, "PUBCOMP");
-			break;
-		case CMD_PUBLISH:
-			rc = handle__publish(context);
-			break;
-		case CMD_PUBREC:
-			rc = handle__pubrec(context);
-			break;
-		case CMD_PUBREL:
-			rc = handle__pubrel(context);
-			break;
-		case CMD_CONNECT:
-			return handle__connect(context);
-		case CMD_DISCONNECT:
-			rc = handle__disconnect(context);
-			break;
-		case CMD_SUBSCRIBE:
-			rc = handle__subscribe(context);
-			break;
-		case CMD_UNSUBSCRIBE:
-			rc = handle__unsubscribe(context);
-			break;
+    switch((context->in_packet.command)&0xF0){
+        case CMD_PINGREQ:
+            rc = handle__pingreq(context);
+            break;
+        case CMD_PINGRESP:
+            rc = handle__pingresp(context);
+            break;
+        case CMD_PUBACK:
+            rc = handle__pubackcomp(context, "PUBACK");
+            break;
+        case CMD_PUBCOMP:
+            rc = handle__pubackcomp(context, "PUBCOMP");
+            break;
+        case CMD_PUBLISH:
+            rc = handle__publish(context);
+            break;
+        case CMD_PUBREC:
+            rc = handle__pubrec(context);
+            break;
+        case CMD_PUBREL:
+            rc = handle__pubrel(context);
+            break;
+        case CMD_CONNECT:
+            return handle__connect(context);
+        case CMD_DISCONNECT:
+            rc = handle__disconnect(context);
+            break;
+        case CMD_SUBSCRIBE:
+            rc = handle__subscribe(context);
+            break;
+        case CMD_UNSUBSCRIBE:
+            rc = handle__unsubscribe(context);
+            break;
 #ifdef WITH_BRIDGE
-		case CMD_CONNACK:
-			rc = handle__connack(context);
-			break;
-		case CMD_SUBACK:
-			rc = handle__suback(context);
-			break;
-		case CMD_UNSUBACK:
-			rc = handle__unsuback(context);
-			break;
+        case CMD_CONNACK:
+            rc = handle__connack(context);
+            break;
+        case CMD_SUBACK:
+            rc = handle__suback(context);
+            break;
+        case CMD_UNSUBACK:
+            rc = handle__unsuback(context);
+            break;
 #endif
-		case CMD_AUTH:
-			rc = handle__auth(context);
-			break;
-		default:
-			rc = MOSQ_ERR_PROTOCOL;
-	}
+        case CMD_AUTH:
+            rc = handle__auth(context);
+            break;
+        default:
+            rc = MOSQ_ERR_PROTOCOL;
+    }
 
-	if(context->protocol == mosq_p_mqtt5){
-		if(rc == MOSQ_ERR_PROTOCOL || rc == MOSQ_ERR_DUPLICATE_PROPERTY){
-			send__disconnect(context, MQTT_RC_PROTOCOL_ERROR, NULL);
-		}else if(rc == MOSQ_ERR_MALFORMED_PACKET){
-			send__disconnect(context, MQTT_RC_MALFORMED_PACKET, NULL);
-		}else if(rc == MOSQ_ERR_QOS_NOT_SUPPORTED){
-			send__disconnect(context, MQTT_RC_QOS_NOT_SUPPORTED, NULL);
-		}else if(rc == MOSQ_ERR_RETAIN_NOT_SUPPORTED){
-			send__disconnect(context, MQTT_RC_RETAIN_NOT_SUPPORTED, NULL);
-		}else if(rc == MOSQ_ERR_TOPIC_ALIAS_INVALID){
-			send__disconnect(context, MQTT_RC_TOPIC_ALIAS_INVALID, NULL);
-		}else if(rc == MOSQ_ERR_UNKNOWN || rc == MOSQ_ERR_NOMEM){
-			send__disconnect(context, MQTT_RC_UNSPECIFIED, NULL);
-		}
-	}
-	return rc;
+    if(context->protocol == mosq_p_mqtt5){
+        if(rc == MOSQ_ERR_PROTOCOL || rc == MOSQ_ERR_DUPLICATE_PROPERTY){
+            send__disconnect(context, MQTT_RC_PROTOCOL_ERROR, NULL);
+        }else if(rc == MOSQ_ERR_MALFORMED_PACKET){
+            send__disconnect(context, MQTT_RC_MALFORMED_PACKET, NULL);
+        }else if(rc == MOSQ_ERR_QOS_NOT_SUPPORTED){
+            send__disconnect(context, MQTT_RC_QOS_NOT_SUPPORTED, NULL);
+        }else if(rc == MOSQ_ERR_RETAIN_NOT_SUPPORTED){
+            send__disconnect(context, MQTT_RC_RETAIN_NOT_SUPPORTED, NULL);
+        }else if(rc == MOSQ_ERR_TOPIC_ALIAS_INVALID){
+            send__disconnect(context, MQTT_RC_TOPIC_ALIAS_INVALID, NULL);
+        }else if(rc == MOSQ_ERR_UNKNOWN || rc == MOSQ_ERR_NOMEM){
+            send__disconnect(context, MQTT_RC_UNSPECIFIED, NULL);
+        }
+    }
+    return rc;
 }

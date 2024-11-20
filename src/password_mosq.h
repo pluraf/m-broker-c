@@ -21,19 +21,19 @@ Contributors:
 #include <stdbool.h>
 
 enum mosquitto_pwhash_type{
-	pw_sha512 = 6,
-	pw_sha512_pbkdf2 = 7,
+    pw_sha512 = 6,
+    pw_sha512_pbkdf2 = 7,
 };
 
 #define SALT_LEN 12
 #define PW_DEFAULT_ITERATIONS 101
 
 struct mosquitto_pw{
-	unsigned char password_hash[64]; /* For SHA512 */
-	unsigned char salt[SALT_LEN];
-	int iterations;
-	enum mosquitto_pwhash_type hashtype;
-	bool valid;
+    unsigned char password_hash[64]; /* For SHA512 */
+    unsigned char salt[SALT_LEN];
+    int iterations;
+    enum mosquitto_pwhash_type hashtype;
+    bool valid;
 };
 
 int pw__hash(const char *password, struct mosquitto_pw *pw, bool new_password, int new_iterations);

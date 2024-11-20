@@ -50,98 +50,98 @@ extern const unsigned char magic[15];
  */
 
 struct PF_header{
-	uint32_t chunk;
-	uint32_t length;
+    uint32_t chunk;
+    uint32_t length;
 };
 
 
 struct PF_cfg{
-	uint64_t last_db_id;
-	uint8_t shutdown;
-	uint8_t dbid_size;
+    uint64_t last_db_id;
+    uint8_t shutdown;
+    uint8_t dbid_size;
 };
 
 struct PF_client_v5{
-	int64_t session_expiry_time;
-	uint32_t session_expiry_interval;
-	uint16_t last_mid;
-	uint16_t id_len;
+    int64_t session_expiry_time;
+    uint32_t session_expiry_interval;
+    uint16_t last_mid;
+    uint16_t id_len;
 };
 struct PF_client{
-	/* struct PF_client_v5; */
-	int64_t session_expiry_time;
-	uint32_t session_expiry_interval;
-	uint16_t last_mid;
-	uint16_t id_len;
+    /* struct PF_client_v5; */
+    int64_t session_expiry_time;
+    uint32_t session_expiry_interval;
+    uint16_t last_mid;
+    uint16_t id_len;
 
-	uint16_t listener_port;
-	uint16_t username_len;
-	/* tail: 4 byte padding, because 64bit member
-	 * forces multiple of 8 for struct size */
+    uint16_t listener_port;
+    uint16_t username_len;
+    /* tail: 4 byte padding, because 64bit member
+     * forces multiple of 8 for struct size */
 };
 struct P_client{
-	struct PF_client F;
-	char *client_id;
-	char *username;
+    struct PF_client F;
+    char *client_id;
+    char *username;
 };
 
 
 struct PF_client_msg{
-	dbid_t store_id;
-	uint16_t mid;
-	uint16_t id_len;
-	uint8_t qos;
-	uint8_t state;
-	uint8_t retain_dup;
-	uint8_t direction;
+    dbid_t store_id;
+    uint16_t mid;
+    uint16_t id_len;
+    uint8_t qos;
+    uint8_t state;
+    uint8_t retain_dup;
+    uint8_t direction;
 };
 struct P_client_msg{
-	struct PF_client_msg F;
-	char *client_id;
-	mosquitto_property *properties;
+    struct PF_client_msg F;
+    char *client_id;
+    mosquitto_property *properties;
 };
 
 
 struct PF_msg_store{
-	dbid_t store_id;
-	int64_t expiry_time;
-	uint32_t payloadlen;
-	uint16_t source_mid;
-	uint16_t source_id_len;
-	uint16_t source_username_len;
-	uint16_t topic_len;
-	uint16_t source_port;
-	uint8_t qos;
-	uint8_t retain;
+    dbid_t store_id;
+    int64_t expiry_time;
+    uint32_t payloadlen;
+    uint16_t source_mid;
+    uint16_t source_id_len;
+    uint16_t source_username_len;
+    uint16_t topic_len;
+    uint16_t source_port;
+    uint8_t qos;
+    uint8_t retain;
 };
 struct P_msg_store{
-	struct PF_msg_store F;
-	void *payload;
-	struct mosquitto source;
-	char *topic;
-	mosquitto_property *properties;
+    struct PF_msg_store F;
+    void *payload;
+    struct mosquitto source;
+    char *topic;
+    mosquitto_property *properties;
 };
 
 
 struct PF_sub{
-	uint32_t identifier;
-	uint16_t id_len;
-	uint16_t topic_len;
-	uint8_t qos;
-	uint8_t options;
+    uint32_t identifier;
+    uint16_t id_len;
+    uint16_t topic_len;
+    uint8_t qos;
+    uint8_t options;
 };
 struct P_sub{
-	struct PF_sub F;
-	char *client_id;
-	char *topic;
+    struct PF_sub F;
+    char *client_id;
+    char *topic;
 };
 
 
 struct PF_retain{
-	dbid_t store_id;
+    dbid_t store_id;
 };
 struct P_retain{
-	struct PF_retain F;
+    struct PF_retain F;
 };
 
 

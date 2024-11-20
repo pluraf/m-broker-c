@@ -29,33 +29,33 @@ Contributors:
 
 int send__unsuback(struct mosquitto *mosq, uint16_t mid, int reason_code_count, uint8_t *reason_codes, const mosquitto_property *properties)
 {
-	struct mosquitto__packet *packet = NULL;
-	int rc;
+    struct mosquitto__packet *packet = NULL;
+    int rc;
 
-	assert(mosq);
-	packet = mosquitto__calloc(1, sizeof(struct mosquitto__packet));
-	if(!packet) return MOSQ_ERR_NOMEM;
+    assert(mosq);
+    packet = mosquitto__calloc(1, sizeof(struct mosquitto__packet));
+    if(!packet) return MOSQ_ERR_NOMEM;
 
-	packet->command = CMD_UNSUBACK;
-	packet->remaining_length = 2;
+    packet->command = CMD_UNSUBACK;
+    packet->remaining_length = 2;
 
-	if(mosq->protocol == mosq_p_mqtt5){
-		packet->remaining_length += property__get_remaining_length(properties);
-		packet->remaining_length += (uint32_t)reason_code_count;
-	}
+    if(mosq->protocol == mosq_p_mqtt5){
+        packet->remaining_length += property__get_remaining_length(properties);
+        packet->remaining_length += (uint32_t)reason_code_count;
+    }
 
-	rc = packet__alloc(packet);
-	if(rc){
-		mosquitto__free(packet);
-		return rc;
-	}
+    rc = packet__alloc(packet);
+    if(rc){
+        mosquitto__free(packet);
+        return rc;
+    }
 
-	packet__write_uint16(packet, mid);
+    packet__write_uint16(packet, mid);
 
-	if(mosq->protocol == mosq_p_mqtt5){
-		property__write_all(packet, properties, true);
+    if(mosq->protocol == mosq_p_mqtt5){
+        property__write_all(packet, properties, true);
         packet__write_bytes(packet, reason_codes, (uint32_t)reason_code_count);
-	}
+    }
 
-	return packet__queue(mosq, packet);
+    return packet__queue(mosq, packet);
 }
