@@ -211,34 +211,32 @@ static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check che
 	clientid = mosquitto_client_clientid(ed->client);
 
 	// First check channels assigned to clientid or username
-	if(clientid || username){
-		channel = dynsec_channels__find(clientid, username);
-		if(channel != NULL){
-			if(check == acl_check_publish_c_send){
-				++channel->msg_received;
-				channel->msg_timestamp = time(NULL);
-			}
-			rc = check(ed, channel->rolelist);
+	channel = dynsec_channels__find(clientid, username);
+	if(channel != NULL){
+		if(check == acl_check_publish_c_send){
+			++channel->msg_received;
+			channel->msg_timestamp = time(NULL);
+		}
+		rc = check(ed, channel->rolelist);
+		if(rc != MOSQ_ERR_NOT_FOUND){
+			return rc;
+		}
+		HASH_ITER(hh, channel->grouplist, grouplist, grouplist_tmp){
+			rc = check(ed, grouplist->group->rolelist);
 			if(rc != MOSQ_ERR_NOT_FOUND){
 				return rc;
 			}
-			HASH_ITER(hh, channel->grouplist, grouplist, grouplist_tmp){
-				rc = check(ed, grouplist->group->rolelist);
-				if(rc != MOSQ_ERR_NOT_FOUND){
-					return rc;
-				}
-			}
-			// Fallback to a defaultACLAccess check
-			if(acl_default_access == false){
+		}
+		// Fallback to a defaultACLAccess check
+		if(acl_default_access == false){
+			return MOSQ_ERR_ACL_DENIED;
+		}else{
+			if(!strncmp(ed->topic, "$CONTROL", strlen("$CONTROL"))){
+				/* We never give fall through access to $CONTROL topics, they must
+				* be granted explicitly. */
 				return MOSQ_ERR_ACL_DENIED;
 			}else{
-				if(!strncmp(ed->topic, "$CONTROL", strlen("$CONTROL"))){
-					/* We never give fall through access to $CONTROL topics, they must
-					* be granted explicitly. */
-					return MOSQ_ERR_ACL_DENIED;
-				}else{
-					return MOSQ_ERR_SUCCESS;
-				}
+				return MOSQ_ERR_SUCCESS;
 			}
 		}
 	}
