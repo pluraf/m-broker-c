@@ -1265,8 +1265,15 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
         }
         cJSON_AddItemToObject(j_channel, "groups", j_groups);
     }else{
-        j_channel = cJSON_CreateString(channel->chanid);
+        j_channel = cJSON_CreateObject();
         if(j_channel == NULL){
+            return NULL;
+        }
+        if((channel->chanid && cJSON_AddStringToObject(j_channel, "chanid", channel->chanid) == NULL)
+                || (cJSON_AddBoolToObject(j_channel, "disabled", channel->disabled) == NULL)
+                || (cJSON_AddNumberToObject(j_channel, "msg_received", channel->msg_received) == NULL)
+                || (cJSON_AddNumberToObject(j_channel, "msg_timestamp", channel->msg_timestamp) == NULL)){
+            cJSON_Delete(j_channel);
             return NULL;
         }
     }
