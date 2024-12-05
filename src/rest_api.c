@@ -307,7 +307,6 @@ char * execute_command(char const * command)
 
 int auth_handler(struct mg_connection * conn, void * cbdata)
 {
-    return 1;
     int authorized = 0;
 
     point_t *public_key = (point_t *)cbdata;
