@@ -633,6 +633,8 @@ int dynsec_channels__process_create(cJSON *j_responses, struct mosquitto *contex
         }
     }
 
+    json_get_bool(command, "disabled", & channel->disabled, false, false);
+
     // Time to check for uniqueness
     // (must add user before groups, otherwise adding groups will fail)
     if(dynsec_channels__add_inorder(channel) != MOSQ_ERR_SUCCESS){
