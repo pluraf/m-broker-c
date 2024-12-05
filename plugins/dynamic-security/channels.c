@@ -113,8 +113,9 @@ static int channel_cmp_by_username(void *a, void *b)
 }
 
 
-int dynsec_channels__add_check_uniqueness(const char * chanid, const char * clientid, const char * username)
-{
+int dynsec_channels__add_check_uniqueness(
+    const char * chanid, const char * clientid, const char * username, const char * selfid
+){
     struct dynsec__channel * existing = NULL;
 
     if (chanid) {
@@ -124,19 +125,23 @@ int dynsec_channels__add_check_uniqueness(const char * chanid, const char * clie
 
     if(clientid){
         HASH_FIND(hh_clientid, local_clientid_channels, clientid, strlen(clientid), existing);
-        if (existing) return MOSQ_ERR_ALREADY_EXISTS;
     }else if(username){
         HASH_FIND(hh_username, local_username_channels, username, strlen(username), existing);
-        if (existing) return MOSQ_ERR_ALREADY_EXISTS;
     }
 
+    if(existing){
+        if(selfid && (strcmp(existing->chanid, selfid) == 0)){
+            return MOSQ_ERR_SUCCESS;
+        }
+        return MOSQ_ERR_ALREADY_EXISTS;
+    }
     return MOSQ_ERR_SUCCESS;
 }
 
 
 int dynsec_channels__add_inorder(struct dynsec__channel * channel)
 {
-    if(dynsec_channels__add_check_uniqueness(channel->chanid, channel->clientid, channel->username) == MOSQ_ERR_SUCCESS){
+    if(dynsec_channels__add_check_uniqueness(channel->chanid, channel->clientid, channel->username, NULL) == MOSQ_ERR_SUCCESS){
         HASH_ADD_KEYPTR_INORDER(hh, local_channels, channel->chanid, strlen(channel->chanid), channel, channel_cmp_by_chanid);
         if(channel->clientid){
             HASH_ADD_KEYPTR_INORDER(hh_clientid, local_clientid_channels, channel->clientid, strlen(channel->clientid), channel, channel_cmp_by_clientid);
@@ -151,7 +156,7 @@ int dynsec_channels__add_inorder(struct dynsec__channel * channel)
 
 int dynsec_channels__add(struct dynsec__channel * channel)
 {
-    if(dynsec_channels__add_check_uniqueness(channel->chanid, channel->clientid, channel->username) == MOSQ_ERR_SUCCESS){
+    if(dynsec_channels__add_check_uniqueness(channel->chanid, channel->clientid, channel->username, NULL) == MOSQ_ERR_SUCCESS){
         HASH_ADD_KEYPTR(hh, local_channels, channel->chanid, strlen(channel->chanid), channel);
         if(channel->clientid){
             HASH_ADD_KEYPTR(hh_clientid, local_clientid_channels, channel->clientid, strlen(channel->clientid), channel);
@@ -1033,7 +1038,7 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
     json_get_string_allow_empty(command, "username", &username, true);
 
     // We need to check uniqueness of clientid and username
-    if(dynsec_channels__add_check_uniqueness(NULL, clientid, username) != MOSQ_ERR_SUCCESS){
+    if(dynsec_channels__add_check_uniqueness(NULL, clientid, username, chanid) != MOSQ_ERR_SUCCESS){
         dynsec__command_reply(j_responses, context, "modifyChannel", "Connector will become ambiguous", correlation_data);
         return MOSQ_ERR_INVAL;
     }
@@ -1065,6 +1070,8 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
             username = NULL;
         }
     }
+
+    json_get_bool(command, "disabled", & channel->disabled, false, false);
 
     if(json_get_string(command, "password", &password, false) == MOSQ_ERR_SUCCESS){
         have_password = true;

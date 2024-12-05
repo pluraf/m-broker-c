@@ -35,6 +35,9 @@ Contributors:
     Gökçe Yetiser Vural <gokce@pluraf.com>
 */
 
+
+#include <cjson/cJSON.h>
+
 #include "civetweb/civetweb.h"
 
 #include "uthash.h"
@@ -46,19 +49,240 @@ Contributors:
 #include "jwt/jwt_helpers.h"
 
 #include <string.h>
+#include <stdio.h>
 
 
-static int handler(struct mg_connection * conn, void * ignored)
+int api_handler(struct mg_connection * conn, void * cbdata);
+int channel_get(struct mg_connection * conn);
+int channel_put(struct mg_connection * conn);
+int channel_post(struct mg_connection * conn);
+int channel_delete(struct mg_connection * conn);
+char * execute_command(char const * command);
+
+
+int api_handler(struct mg_connection * conn, void * cbdata) {
+    const struct mg_request_info *req_info = mg_get_request_info(conn);
+    if (strcmp(req_info->request_method, "GET") == 0) {
+        return channel_get(conn);
+    } else if (strcmp(req_info->request_method, "PUT") == 0) {
+        return channel_put(conn);
+    } else if (strcmp(req_info->request_method, "POST") == 0) {
+        return channel_post(conn);
+    } else if (strcmp(req_info->request_method, "DELETE") == 0) {
+        return channel_delete(conn);
+    } else {
+        mg_send_http_error(conn, 405, "Method Not Allowed");
+        return 405;
+    }
+    return 0;
+}
+
+
+int channel_get(struct mg_connection * conn)
 {
-    char *response;
-    uint8_t buf[1024] = {0};
+    int return_code = 200;
+    cJSON * pipeline_data;
+    const struct mg_request_info * req_info = mg_get_request_info(conn);
 
-    mg_read(conn, buf, sizeof(buf));  // TODO: Read until 0 or -1
+    const char * last_segment = strrchr(req_info->request_uri, '/');
+    if(last_segment && strlen(last_segment) > 1){
+        char const * chanid = last_segment + 1;
+        char command[200];
+        snprintf(
+            command,
+            sizeof(command),
+            "{\"commands\":[{\"command\":\"getChannel\",\"chanid\":\"%s\"}]}", chanid
+        );
+        char * result = execute_command(command);
+        cJSON * j_result = cJSON_Parse(result);
+        cJSON * j_tmp = cJSON_GetArrayItem(cJSON_GetObjectItem(j_result, "responses") , 0);
+        if(cJSON_GetObjectItem(j_tmp, "error")){
+            mg_send_http_error(conn, 404, "Not Found");
+            return_code = 404;
+        }else{
+            cJSON * channel = cJSON_GetObjectItem(cJSON_GetObjectItem(j_tmp, "data"), "channel");
+            char * payload = cJSON_PrintUnformatted(channel);
+            size_t payload_size = strlen(payload);
+            mg_send_http_ok(conn, "application/json", payload_size);
+            mg_write(conn, payload, payload_size);
+            free(payload);
+        }
+        free(result);
+        cJSON_Delete(j_result);
+    }else{
+        char * command = "{\"commands\":[{\"command\":\"listChannels\",\"verbose\":false}]}";
+        char * result = execute_command(command);
+        cJSON * j_result = cJSON_Parse(result);
+        cJSON * channels = cJSON_GetObjectItem(
+            cJSON_GetObjectItem(
+                cJSON_GetArrayItem(cJSON_GetObjectItem(j_result, "responses") , 0),
+                "data"
+            ),
+            "channels"
+        );
+        char * payload = cJSON_PrintUnformatted(channels);
+        size_t payload_size = strlen(payload);
+        mg_send_http_ok(conn, "application/json", payload_size);
+        mg_write(conn, payload, payload_size);
+        free(result);
+        free(payload);
+        cJSON_Delete(j_result);
+    }
+    return return_code;
+}
 
+
+int channel_put(struct mg_connection * conn)
+{
+    int return_code = 200;
+    cJSON * pipeline_data;
+    const struct mg_request_info * req_info = mg_get_request_info(conn);
+
+    const char * last_segment = strrchr(req_info->request_uri, '/');
+    if(last_segment && strlen(last_segment) > 1){
+        char const * chanid = last_segment + 1;
+        uint8_t buf[1024] = {0};
+        mg_read(conn, buf, sizeof(buf));  // TODO: Read until 0 or -1
+        cJSON * j_payload = cJSON_Parse(buf);
+        if(j_payload){
+            cJSON * j_wrapper = cJSON_CreateObject();
+            cJSON * j_commands =  cJSON_AddArrayToObject(j_wrapper, "commands");
+            cJSON_AddStringToObject(j_payload, "command", "modifyChannel");
+            cJSON_AddStringToObject(j_payload, "chanid", chanid);
+            cJSON_AddItemToArray(j_commands, j_payload);
+            char * command = cJSON_PrintUnformatted(j_wrapper);
+            mosquitto_log_printf(MOSQ_LOG_ERR, command);
+            char * result = execute_command(command);
+            free(command);
+            free(j_wrapper);
+            cJSON * j_result = cJSON_Parse(result);
+            cJSON * j_tmp = cJSON_GetArrayItem(cJSON_GetObjectItem(j_result, "responses") , 0);
+
+            cJSON * error = cJSON_GetObjectItem(j_tmp, "error");
+            if(error){
+                char const * error_str = cJSON_GetStringValue(error);
+                if(strcmp("Channel not found", error_str) == 0){
+                    return_code = 404;
+                    mg_send_http_error(conn, return_code, error_str);
+                }else{
+                    return_code = 400;
+                    mg_send_http_error(conn, 400, error_str);
+                }
+            }else{
+                mg_send_http_ok(conn, "text/plain", 0);
+            }
+            free(result);
+            cJSON_Delete(j_result);
+        }else{
+            return_code = 400;
+            mg_send_http_error(conn, return_code, "Invalid Request");
+        }
+    }else{
+        return_code = 400;
+        mg_send_http_error(conn, return_code, "Invalid Request");
+
+    }
+    return return_code;
+}
+
+
+int channel_post(struct mg_connection * conn)
+{
+    int return_code = 200;
+    cJSON * pipeline_data;
+    const struct mg_request_info * req_info = mg_get_request_info(conn);
+
+    const char * last_segment = strrchr(req_info->request_uri, '/');
+    if(last_segment && strlen(last_segment) > 1){
+        char const * chanid = last_segment + 1;
+        uint8_t buf[1024] = {0};
+        mg_read(conn, buf, sizeof(buf));  // TODO: Read until 0 or -1
+        cJSON * j_payload = cJSON_Parse(buf);
+        if(j_payload){
+            cJSON * j_wrapper = cJSON_CreateObject();
+            cJSON * j_commands =  cJSON_AddArrayToObject(j_wrapper, "commands");
+            cJSON_AddStringToObject(j_payload, "command", "createChannel");
+            cJSON_AddStringToObject(j_payload, "chanid", chanid);
+            cJSON_AddItemToArray(j_commands, j_payload);
+            char * command = cJSON_PrintUnformatted(j_wrapper);
+            mosquitto_log_printf(MOSQ_LOG_ERR, command);
+            char * result = execute_command(command);
+            free(command);
+            free(j_wrapper);
+            cJSON * j_result = cJSON_Parse(result);
+            cJSON * j_tmp = cJSON_GetArrayItem(cJSON_GetObjectItem(j_result, "responses") , 0);
+            cJSON * error = cJSON_GetObjectItem(j_tmp, "error");
+            if(error){
+                char const * error_str = cJSON_GetStringValue(error);
+                return_code = 400;
+                mg_send_http_error(conn, 400, error_str);
+            }else{
+                mg_send_http_ok(conn, "text/plain", 0);
+            }
+            free(result);
+            cJSON_Delete(j_result);
+        }else{
+            return_code = 400;
+            mg_send_http_error(conn, return_code, "Invalid Request");
+        }
+    }else{
+        return_code = 400;
+        mg_send_http_error(conn, return_code, "Invalid Request");
+    }
+    return return_code;
+}
+
+
+int channel_delete(struct mg_connection * conn)
+{
+    int return_code = 200;
+    cJSON * pipeline_data;
+    const struct mg_request_info * req_info = mg_get_request_info(conn);
+
+    const char * last_segment = strrchr(req_info->request_uri, '/');
+    if(last_segment && strlen(last_segment) > 1){
+        char const * chanid = last_segment + 1;
+        cJSON * j_wrapper = cJSON_CreateObject();
+        cJSON * j_commands =  cJSON_AddArrayToObject(j_wrapper, "commands");
+
+        cJSON * j_command = cJSON_CreateObject();
+        cJSON_AddItemReferenceToObject(
+            j_command, "channels", cJSON_CreateStringArray(& chanid, 1)
+        );
+        cJSON_AddStringToObject(j_command, "command", "deleteChannels");
+        cJSON_AddItemReferenceToArray(j_commands, j_command);
+        char * command = cJSON_PrintUnformatted(j_wrapper);
+        mosquitto_log_printf(MOSQ_LOG_ERR, command);
+        char * result = execute_command(command);
+        free(command);
+        free(j_wrapper);
+        cJSON * j_result = cJSON_Parse(result);
+        cJSON * j_tmp = cJSON_GetArrayItem(cJSON_GetObjectItem(j_result, "responses") , 0);
+        cJSON * error = cJSON_GetObjectItem(j_tmp, "error");
+        if(error){
+            char const * error_str = cJSON_GetStringValue(error);
+            return_code = 400;
+            mg_send_http_error(conn, 400, error_str);
+        }else{
+            mg_send_http_ok(conn, "text/plain", 0);
+        }
+        free(result);
+        cJSON_Delete(j_result);
+    }else{
+        return_code = 400;
+        mg_send_http_error(conn, return_code, "Invalid Request");
+    }
+    return return_code;
+}
+
+
+char * execute_command(char const * command)
+{
     struct mosquitto__callback *cb_found;
     struct mosquitto_evt_control event_data;
     struct mosquitto__security_options *opts = &db.config->security_options;
     mosquitto_property *properties = NULL;
+    char * response = NULL;
 
     const char * topic = "$CONTROL/dynamic-security/v1";
     HASH_FIND(hh, opts->plugin_callbacks.control, topic, strlen(topic), cb_found);
@@ -66,8 +290,8 @@ static int handler(struct mg_connection * conn, void * ignored)
         memset(&event_data, 0, sizeof(event_data));
         event_data.client = NULL;
         event_data.topic = topic;
-        event_data.payload = buf;
-        event_data.payloadlen = strlen((char*)buf);
+        event_data.payload = command;
+        event_data.payloadlen = strlen(command);
         event_data.qos = 0;
         event_data.retain = 0;
         event_data.properties = NULL;
@@ -75,21 +299,15 @@ static int handler(struct mg_connection * conn, void * ignored)
         event_data.reason_string = NULL;
         int rc = cb_found->cb(MOSQ_EVT_CONTROL, &event_data, &response);
         free(event_data.reason_string);
+        return response;
     }
-
-    unsigned long len = (unsigned long)strlen(response);
-
-    mg_send_http_ok(conn, "application/json", len);
-
-    mg_write(conn, response, len);
-    free(response);
-
-    return 200;  // HTTP state 200 = OK
+    return NULL;
 }
 
 
 int auth_handler(struct mg_connection * conn, void * cbdata)
 {
+    return 1;
     int authorized = 0;
 
     point_t *public_key = (point_t *)cbdata;
@@ -131,7 +349,7 @@ struct mg_context * start_server()
     char const * options[] = {"listening_ports", "8001", NULL};
     ctx = mg_start(NULL, 0, options);
 
-    mg_set_request_handler(ctx, "/command$", handler, NULL);
+    mg_set_request_handler(ctx, "/channel/", api_handler, NULL);
     mg_set_auth_handler(ctx, "/**", auth_handler, public_key);
 
     return ctx;
