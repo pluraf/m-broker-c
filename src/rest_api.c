@@ -51,6 +51,7 @@ Contributors:
 #include <string.h>
 #include <stdio.h>
 
+static bool api_authentication = true;
 
 int api_handler(struct mg_connection * conn, void * cbdata);
 int channel_get(struct mg_connection * conn);
@@ -59,6 +60,9 @@ int channel_post(struct mg_connection * conn);
 int channel_delete(struct mg_connection * conn);
 char * execute_command(char const * command);
 
+void set_api_authentication(bool value){
+    api_authentication = value;
+}
 
 int api_handler(struct mg_connection * conn, void * cbdata) {
     const struct mg_request_info *req_info = mg_get_request_info(conn);
@@ -307,6 +311,9 @@ char * execute_command(char const * command)
 
 int auth_handler(struct mg_connection * conn, void * cbdata)
 {
+    if(!api_authentication){
+        return 1;
+    }
     int authorized = 0;
 
     point_t *public_key = (point_t *)cbdata;
