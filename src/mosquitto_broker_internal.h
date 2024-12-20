@@ -339,6 +339,7 @@ struct mosquitto__config {
 #endif
     struct mosquitto__security_options security_options;
     char * http_api_pkey_file;
+    bool api_authentication;
 };
 
 
@@ -636,6 +637,7 @@ int drop_privileges(struct mosquitto__config *config);
 
 void config__update_allow_anonymous(struct mosquitto__config *config, bool allow);
 int config__write(struct mosquitto__config *config);
+void config__update_api_authentication(struct mosquitto__config *config, bool allow);
 
 /* ============================================================
  * Server send functions

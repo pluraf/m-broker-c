@@ -60,9 +60,6 @@ int channel_post(struct mg_connection * conn);
 int channel_delete(struct mg_connection * conn);
 char * execute_command(char const * command);
 
-void set_api_authentication(bool value){
-    api_authentication = value;
-}
 
 int api_handler(struct mg_connection * conn, void * cbdata) {
     const struct mg_request_info *req_info = mg_get_request_info(conn);
@@ -311,7 +308,7 @@ char * execute_command(char const * command)
 
 int auth_handler(struct mg_connection * conn, void * cbdata)
 {
-    if(!api_authentication){
+    if(!db.config->api_authentication){
         return 1;
     }
     int authorized = 0;
