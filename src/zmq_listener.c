@@ -42,7 +42,6 @@ Contributors:
 #undef WITH_BROKER  // FIXME:
 #include "mosquitto_broker_internal.h"
 #include "zmq_listener.h"
-#include "rest_api.h"
 
 void * g_context;
 pthread_t g_zmq_th;
@@ -59,13 +58,21 @@ int handle_request(char * command, char * response){
         return 1;
     }
     if(strcmp(command, "set_api_auth_on") == 0){
-        set_api_authentication(true);
-        strcpy(response, "ok");
+        config__update_api_authentication(db.config, true);
+        if(config__write(db.config) == 0){
+            strcpy(response, "ok");
+        }else{
+            strcpy(response, "fail");
+        }
         return 1;
     }
     if(strcmp(command, "set_api_auth_off") == 0){
-        set_api_authentication(false);
-        strcpy(response, "ok");
+        config__update_api_authentication(db.config, false);
+        if(config__write(db.config) == 0){
+            strcpy(response, "ok");
+        }else{
+            strcpy(response, "fail");
+        }
         return 1;
     }
     return 0;

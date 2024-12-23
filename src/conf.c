@@ -276,6 +276,7 @@ void config__init(struct mosquitto__config *config)
     memset(config, 0, sizeof(struct mosquitto__config));
     config__init_reload(config);
 
+    config->api_authentication = true;
     config->daemon = false;
     memset(&config->default_listener, 0, sizeof(struct mosquitto__listener));
     listener__set_defaults(&config->default_listener);
@@ -2194,6 +2195,8 @@ static int config__read_file_core(struct mosquitto__config *config, bool reload,
 #endif
                 }else if(!strcmp(token, "http_api_pkey_file")){
                     if(conf__parse_string(&token, "http_api_pkey_file", &config->http_api_pkey_file, saveptr)) return MOSQ_ERR_INVAL;
+                }else if(!strcmp(token, "api_authentication")){
+                   if(conf__parse_bool(&token, "api_authentication", &config->api_authentication, saveptr)) return MOSQ_ERR_INVAL;
                 }else{
                     log__printf(NULL, MOSQ_LOG_ERR, "Error: Unknown configuration variable \"%s\".", token);
                     return MOSQ_ERR_INVAL;
@@ -2425,15 +2428,22 @@ int config__write(struct mosquitto__config *config){
     }
 
     char line[256];
+    bool api_auth_written = false;
     // NOTE: config files with lines longer than 255 symbols are not supported
     // lines longer than 255 symbols will be splited into several lines
 
     const char *new_global_line = config->security_options.allow_anonymous
                                     ? "allow_anonymous true\n" : "allow_anonymous false\n";
-
+    const char *api_auth_line = config->api_authentication
+                                    ? "api_authentication true\n" : "api_authentication false\n";
     bool listener_local = false;
     int astr_len = strlen("allow_anonymous");
     while(fgets(line, sizeof(line), file)){
+        if(strstr(line, "api_authentication") != NULL){         
+            fputs(api_auth_line, temp_file);
+            api_auth_written = true;
+            continue;
+        }
         if(strstr(line, "listener") != NULL){
             listener_local = strstr(line, "127.0.0.1") != NULL
                                 || strstr(line, "localhost") != NULL;
@@ -2443,7 +2453,10 @@ int config__write(struct mosquitto__config *config){
         }
         fputs(line, temp_file);
     }
-
+    if(!api_auth_written){
+        fputs(api_auth_line, temp_file);
+        api_auth_written = true;
+    }
     fclose(file);
     rewind(temp_file);
 
@@ -2472,4 +2485,8 @@ void config__update_allow_anonymous(struct mosquitto__config *config, bool allow
         }
     }
     config->security_options.allow_anonymous = allow;
+}
+
+void config__update_api_authentication(struct mosquitto__config *config, bool allow){
+    config->api_authentication = allow;
 }
