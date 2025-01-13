@@ -457,98 +457,6 @@ int config__parse_args(struct mosquitto__config *config, int argc, char *argv[])
         }
     }
 
-    if(config->default_listener.bind_interface
-#ifdef WITH_TLS
-            || config->default_listener.cafile
-            || config->default_listener.capath
-            || config->default_listener.certfile
-            || config->default_listener.keyfile
-            || config->default_listener.tls_engine
-            || config->default_listener.tls_keyform != mosq_k_pem
-            || config->default_listener.tls_engine_kpass_sha1
-            || config->default_listener.ciphers
-            || config->default_listener.ciphers_tls13
-            || config->default_listener.dhparamfile
-            || config->default_listener.psk_hint
-            || config->default_listener.require_certificate
-            || config->default_listener.crlfile
-            || config->default_listener.use_identity_as_username
-            || config->default_listener.use_subject_as_username
-#endif
-            || config->default_listener.use_username_as_clientid
-            || config->default_listener.host
-            || config->default_listener.port
-            || config->default_listener.max_connections != -1
-            || config->default_listener.max_qos != 2
-            || config->default_listener.mount_point
-            || config->default_listener.protocol != mp_mqtt
-            || config->default_listener.socket_domain
-            || config->default_listener.security_options.password_file
-            || config->default_listener.security_options.psk_file
-            || config->default_listener.security_options.auth_plugin_config_count
-            || config->default_listener.security_options.allow_zero_length_clientid != true
-            ){
-
-        config->listener_count++;
-        config->listeners = mosquitto__realloc(config->listeners, sizeof(struct mosquitto__listener)*(size_t)config->listener_count);
-        if(!config->listeners){
-            log__printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
-            return MOSQ_ERR_NOMEM;
-        }
-        memset(&config->listeners[config->listener_count-1], 0, sizeof(struct mosquitto__listener));
-        if(config->default_listener.port){
-            config->listeners[config->listener_count-1].port = config->default_listener.port;
-        }else{
-            config->listeners[config->listener_count-1].port = 1883;
-        }
-        if(config->default_listener.host){
-            config->listeners[config->listener_count-1].host = config->default_listener.host;
-        }else{
-            config->listeners[config->listener_count-1].host = NULL;
-        }
-        if(config->default_listener.mount_point){
-            config->listeners[config->listener_count-1].mount_point = config->default_listener.mount_point;
-        }else{
-            config->listeners[config->listener_count-1].mount_point = NULL;
-        }
-        config->listeners[config->listener_count-1].bind_interface = config->default_listener.bind_interface;
-        config->listeners[config->listener_count-1].max_connections = config->default_listener.max_connections;
-        config->listeners[config->listener_count-1].protocol = config->default_listener.protocol;
-        config->listeners[config->listener_count-1].socket_domain = config->default_listener.socket_domain;
-        config->listeners[config->listener_count-1].socks = NULL;
-        config->listeners[config->listener_count-1].sock_count = 0;
-        config->listeners[config->listener_count-1].client_count = 0;
-        config->listeners[config->listener_count-1].use_username_as_clientid = config->default_listener.use_username_as_clientid;
-        config->listeners[config->listener_count-1].max_qos = config->default_listener.max_qos;
-        config->listeners[config->listener_count-1].max_topic_alias = config->default_listener.max_topic_alias;
-#ifdef WITH_TLS
-        config->listeners[config->listener_count-1].tls_version = config->default_listener.tls_version;
-        config->listeners[config->listener_count-1].tls_engine = config->default_listener.tls_engine;
-        config->listeners[config->listener_count-1].tls_keyform = config->default_listener.tls_keyform;
-        config->listeners[config->listener_count-1].tls_engine_kpass_sha1 = config->default_listener.tls_engine_kpass_sha1;
-        config->listeners[config->listener_count-1].cafile = config->default_listener.cafile;
-        config->listeners[config->listener_count-1].capath = config->default_listener.capath;
-        config->listeners[config->listener_count-1].certfile = config->default_listener.certfile;
-        config->listeners[config->listener_count-1].keyfile = config->default_listener.keyfile;
-        config->listeners[config->listener_count-1].ciphers = config->default_listener.ciphers;
-        config->listeners[config->listener_count-1].ciphers_tls13 = config->default_listener.ciphers_tls13;
-        config->listeners[config->listener_count-1].dhparamfile = config->default_listener.dhparamfile;
-        config->listeners[config->listener_count-1].psk_hint = config->default_listener.psk_hint;
-        config->listeners[config->listener_count-1].require_certificate = config->default_listener.require_certificate;
-        config->listeners[config->listener_count-1].ssl_ctx = NULL;
-        config->listeners[config->listener_count-1].crlfile = config->default_listener.crlfile;
-        config->listeners[config->listener_count-1].use_identity_as_username = config->default_listener.use_identity_as_username;
-        config->listeners[config->listener_count-1].use_subject_as_username = config->default_listener.use_subject_as_username;
-#endif
-        config->listeners[config->listener_count-1].security_options.acl_file = config->default_listener.security_options.acl_file;
-        config->listeners[config->listener_count-1].security_options.password_file = config->default_listener.security_options.password_file;
-        config->listeners[config->listener_count-1].security_options.psk_file = config->default_listener.security_options.psk_file;
-        config->listeners[config->listener_count-1].security_options.auth_plugin_configs = config->default_listener.security_options.auth_plugin_configs;
-        config->listeners[config->listener_count-1].security_options.auth_plugin_config_count = config->default_listener.security_options.auth_plugin_config_count;
-        config->listeners[config->listener_count-1].security_options.allow_anonymous = config->default_listener.security_options.allow_anonymous;
-        config->listeners[config->listener_count-1].security_options.allow_zero_length_clientid = config->default_listener.security_options.allow_zero_length_clientid;
-    }
-
     /* Default to drop to mosquitto user if we are privileged and no user specified. */
     if(!config->user){
         config->user = mosquitto__strdup("mosquitto");
@@ -2439,7 +2347,7 @@ int config__write(struct mosquitto__config *config){
     bool listener_local = false;
     int astr_len = strlen("allow_anonymous");
     while(fgets(line, sizeof(line), file)){
-        if(strstr(line, "api_authentication") != NULL){         
+        if(strstr(line, "api_authentication") != NULL){
             fputs(api_auth_line, temp_file);
             api_auth_written = true;
             continue;
