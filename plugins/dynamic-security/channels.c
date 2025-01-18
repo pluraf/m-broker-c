@@ -370,8 +370,11 @@ int dynsec_channels__config_load(cJSON *tree)
                 channel->disabled = disabled;
             }
 
+
+
             // Password
-            if(json_get_object(j_channel, "password", &j_password, true), j_password){
+            if(strcmp(channel->authtype, MQTT_AUTH_PASSWORD) == 0
+                    && json_get_object(j_channel, "secret", &j_password, true) == MOSQ_ERR_SUCCESS){
                 char *salt, *password;
                 int iterations;
                 json_get_string(j_password, "salt", &salt, false);
@@ -403,8 +406,9 @@ int dynsec_channels__config_load(cJSON *tree)
             }
 
             // JWT key
-            char * jwtkey;
-            if(json_get_string(j_channel, "jwtkey", &jwtkey, true), jwtkey){
+            char * jwtkey = NULL;
+            if(strncmp(channel->authtype, MQTT_AUTH_KEY_PREFIX, strlen(MQTT_AUTH_KEY_PREFIX)) == 0
+                    && json_get_string(j_channel, "secret", &jwtkey, true), jwtkey){
                 channel->jwtkey = mosquitto_strdup(jwtkey);
                 if(channel->jwtkey == NULL){
                     channel__unallocate_item(channel);
@@ -541,7 +545,7 @@ int dynsec_channels__config_save(cJSON *tree)
 
 int dynsec_channels__process_create(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
 {
-    char * username, * password, * clientid, * chanid;
+    char * username, * secret, * clientid, * chanid;
     char * text_name, * text_description, * authtype;
     struct dynsec__channel * channel;
     int rc;
@@ -586,8 +590,8 @@ int dynsec_channels__process_create(cJSON *j_responses, struct mosquitto *contex
         return MOSQ_ERR_INVAL;
     }
 
-    if(json_get_string(command, "password", &password, strcmp(authtype, MQTT_AUTH_NONE) == 0) != MOSQ_ERR_SUCCESS){
-        dynsec__command_reply(j_responses, context, "createChannel", "Invalid/missing password", correlation_data);
+    if(json_get_string(command, "secret", & secret, strcmp(authtype, MQTT_AUTH_NONE) == 0) != MOSQ_ERR_SUCCESS){
+        dynsec__command_reply(j_responses, context, "createChannel", "Invalid/missing secret", correlation_data);
         return MOSQ_ERR_INVAL;
     }
 
@@ -650,14 +654,14 @@ int dynsec_channels__process_create(cJSON *j_responses, struct mosquitto *contex
     }
 
     if (strcmp(channel->authtype, MQTT_AUTH_PASSWORD) == 0){
-        if(dynsec_auth__pw_hash(channel, password, channel->pw.password_hash, sizeof(channel->pw.password_hash), true)){
+        if(dynsec_auth__pw_hash(channel, secret, channel->pw.password_hash, sizeof(channel->pw.password_hash), true)){
             dynsec__command_reply(j_responses, context, "createChannel", "Internal error", correlation_data);
             channel__free_item(channel);
             return MOSQ_ERR_NOMEM;
         }
         channel->pw.valid = true;
     }else if(strncmp(MQTT_AUTH_KEY_PREFIX, channel->authtype, strlen(MQTT_AUTH_KEY_PREFIX)) == 0){
-        channel->jwtkey = mosquitto_strdup(password);
+        channel->jwtkey = mosquitto_strdup(secret);
     }
 
     if(text_name){
@@ -723,8 +727,8 @@ int dynsec_channels__process_create(cJSON *j_responses, struct mosquitto *contex
 
     admin_clientid = mosquitto_client_id(context);
     admin_username = mosquitto_client_username(context);
-    mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | createChannel | username=%s | password=%s",
-            admin_clientid, admin_username, username, password?"*****":"no password");
+    mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | createChannel | username=%s | secret=%s",
+            admin_clientid, admin_username, username, secret?"*****":"no secret");
 
     return MOSQ_ERR_SUCCESS;
 }
@@ -923,16 +927,26 @@ int dynsec_channels__process_set_id(cJSON *j_responses, struct mosquitto *contex
 }
 
 
-static int channel__set_password(struct dynsec__channel * channel, const char *password)
+static int channel__set_secret(struct dynsec__channel * channel, const char * secret)
 {
-    if(dynsec_auth__pw_hash(channel, password, channel->pw.password_hash, sizeof(channel->pw.password_hash), true) == MOSQ_ERR_SUCCESS){
-        channel->pw.valid = true;
-
+    if(strncmp(channel->authtype, MQTT_AUTH_KEY_PREFIX, strlen(MQTT_AUTH_KEY_PREFIX)) == 0){
+        channel->jwtkey = mosquitto_strdup(secret);
+        if(channel->jwtkey == NULL){
+            return MOSQ_ERR_NOMEM;
+        }
+        channel->pw.valid = false;
         return MOSQ_ERR_SUCCESS;
     }else{
-        channel->pw.valid = false;
-        /* FIXME - this should fail safe without modifying the existing password */
-        return MOSQ_ERR_NOMEM;
+        if(dynsec_auth__pw_hash(channel, secret, channel->pw.password_hash, sizeof(channel->pw.password_hash), true) == MOSQ_ERR_SUCCESS){
+            channel->pw.valid = true;
+            mosquitto_free(channel->jwtkey);
+            channel->jwtkey = NULL;
+            return MOSQ_ERR_SUCCESS;
+        }else{
+            channel->pw.valid = false;
+            /* FIXME - this should fail safe without modifying the existing secret */
+            return MOSQ_ERR_NOMEM;
+        }
     }
 }
 
@@ -952,8 +966,8 @@ int dynsec_channels__process_set_password(cJSON *j_responses, struct mosquitto *
         return MOSQ_ERR_INVAL;
     }
 
-    if(json_get_string(command, "password", &password, false) != MOSQ_ERR_SUCCESS){
-        dynsec__command_reply(j_responses, context, "setChannelPassword", "Invalid/missing password", correlation_data);
+    if(json_get_string(command, "secret", &password, false) != MOSQ_ERR_SUCCESS){
+        dynsec__command_reply(j_responses, context, "setChannelPassword", "Invalid/missing secret", correlation_data);
         return MOSQ_ERR_INVAL;
     }
     if(strlen(password) == 0){
@@ -966,7 +980,7 @@ int dynsec_channels__process_set_password(cJSON *j_responses, struct mosquitto *
         dynsec__command_reply(j_responses, context, "setChannelPassword", "Channel not found", correlation_data);
         return MOSQ_ERR_SUCCESS;
     }
-    rc = channel__set_password(channel, password);
+    rc = channel__set_secret(channel, password);
     if(rc == MOSQ_ERR_SUCCESS){
         dynsec__config_save();
         dynsec__command_reply(j_responses, context, "setChannelPassword", NULL, correlation_data);
@@ -1008,9 +1022,11 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
     char * chanid;
     char * clientid = NULL;
     char * username = NULL;
-    char * password = NULL;
-    char * text_name = NULL, * text_description = NULL;
-    bool have_clientid = false, have_text_name = false, have_text_description = false, have_rolelist = false, have_password = false;
+    char * authtype = NULL;
+    char * secret = NULL;
+    char * text_name = NULL;
+    char * text_description = NULL;
+    bool have_clientid = false, have_text_name = false, have_text_description = false, have_rolelist = false, have_secret = false;
     bool have_username = false;
     struct dynsec__channel * channel;
     struct dynsec__group *group;
@@ -1075,8 +1091,12 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
 
     json_get_bool(command, "disabled", & channel->disabled, false, false);
 
-    if(json_get_string(command, "password", &password, false) == MOSQ_ERR_SUCCESS){
-        have_password = true;
+    if(json_get_string(command, "secret", & secret, false) == MOSQ_ERR_SUCCESS){
+        if(json_get_string(command, "authtype", & authtype, false) != MOSQ_ERR_SUCCESS){
+            dynsec__command_reply(j_responses, context, "modifyChannel", "Invalid/missing authtype", correlation_data);
+            return MOSQ_ERR_INVAL;
+        }
+        have_secret = true;
     }
 
     if(json_get_string_allow_empty(command, "textname", &str, false) == MOSQ_ERR_SUCCESS){
@@ -1153,13 +1173,20 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
         }
     }
 
-    if(have_password){
+    if(have_secret){
         /* FIXME - This is the one call that will result in modification on internal error - note that groups have already been modified */
-        rc = channel__set_password(channel, password);
+        mosquitto_free(channel->authtype);
+        channel->authtype = mosquitto_strdup(authtype);
+        if(channel->authtype == NULL){
+            rc = MOSQ_ERR_NOMEM;
+            goto error;
+        }
+
+        rc = channel__set_secret(channel, secret);
         if(rc != MOSQ_ERR_SUCCESS){
             dynsec__command_reply(j_responses, context, "modifyChannel", "Internal error", correlation_data);
             dynsec_channels__kick_channels(channel);
-            /* If this fails we have the situation that the password is set as
+            /* If this fails we have the situation that the secret is set as
              * invalid, but the config isn't saved, so restarting the broker
              * *now* will mean the channel can log in again. This might be
              * "good", but is inconsistent, so save the config to be
