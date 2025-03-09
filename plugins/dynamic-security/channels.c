@@ -1273,14 +1273,14 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
             return NULL;
         }
 
-        if((channel->chanid && cJSON_AddStringToObject(j_channel, "chanid", channel->chanid) == NULL)
+        if((channel->chanid && cJSON_AddStringToObject(j_channel, "id", channel->chanid) == NULL)
                 || (channel->authtype && cJSON_AddStringToObject(j_channel, "authtype", channel->authtype) == NULL)
                 || (channel->username && (cJSON_AddStringToObject(j_channel, "username", channel->username) == NULL))
                 || (channel->clientid && (cJSON_AddStringToObject(j_channel, "clientid", channel->clientid) == NULL))
                 || (channel->jwtkey && (cJSON_AddStringToObject(j_channel, "jwtkey", channel->jwtkey) == NULL))
                 || (channel->text_name && (cJSON_AddStringToObject(j_channel, "textname", channel->text_name) == NULL))
                 || (channel->text_description && (cJSON_AddStringToObject(j_channel, "textdescription", channel->text_description) == NULL))
-                || (cJSON_AddBoolToObject(j_channel, "disabled", channel->disabled) == NULL)
+                || (cJSON_AddStringToObject(j_channel, "state", channel->disabled ? "DISABLED" : "ENABLED") == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_received", channel->msg_received) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_timestamp", channel->msg_timestamp) == NULL)){
             cJSON_Delete(j_channel);
@@ -1305,8 +1305,8 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
         if(j_channel == NULL){
             return NULL;
         }
-        if((channel->chanid && cJSON_AddStringToObject(j_channel, "chanid", channel->chanid) == NULL)
-                || (cJSON_AddBoolToObject(j_channel, "disabled", channel->disabled) == NULL)
+        if((channel->chanid && cJSON_AddStringToObject(j_channel, "id", channel->chanid) == NULL)
+                || (cJSON_AddStringToObject(j_channel, "state", channel->disabled ? "DISABLED" : "ENABLED") == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_received", channel->msg_received) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_timestamp", channel->msg_timestamp) == NULL)){
             cJSON_Delete(j_channel);

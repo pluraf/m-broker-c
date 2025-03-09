@@ -39,15 +39,20 @@ Contributors:
 #include <zmq.h>
 
 #include "API_VERSION.h"
+#include "zmq_listener.h"
+#include "zmq_api.h"
 #undef WITH_BROKER  // FIXME:
 #include "mosquitto_broker_internal.h"
-#include "zmq_listener.h"
+
+
 
 void * g_context;
 pthread_t g_zmq_th;
 
 
-int handle_request(char * command, char * response){
+struct payload_t handle_request(unsigned char * command, size_t command_len){
+    return zmq_api_handler(command, command_len);
+/*
     response[0] = 0;
     if(strcmp(command, "api_version") == 0){
         strcpy(response, MQBC_API_VERSION);
@@ -75,7 +80,7 @@ int handle_request(char * command, char * response){
         }
         return 1;
     }
-    return 0;
+    return 0;*/
 }
 
 
@@ -85,10 +90,10 @@ void * zmq_listener(void * arg){
     int rc = zmq_bind(responder, "ipc:///tmp/mqbc-zmq.sock");
     if(rc != 0) return NULL;
 
-    char in_buffer[100];
-    char out_buffer[100];
+    unsigned char in_buffer[700];
+    unsigned char out_buffer[100];
     while(1){
-        int num = zmq_recv(responder, in_buffer, 100, 0);
+        int num = zmq_recv(responder, in_buffer, sizeof(in_buffer) - 1, 0);
         if(num == -1 && zmq_errno() == ETERM){
             break;
         }
@@ -96,11 +101,13 @@ void * zmq_listener(void * arg){
             zmq_send(responder, &db.config->security_options.allow_anonymous, 1, 0);
         }else{
             in_buffer[num] = '\0';
-            if(handle_request(in_buffer, out_buffer) != 1){
-                config__update_allow_anonymous(db.config, in_buffer[0]);
-                config__write(db.config);
-            }
-            zmq_send(responder, out_buffer, strlen(out_buffer), 0);
+            struct payload_t response = handle_request(in_buffer, num);
+            //if(handle_request(in_buffer, num, out_buffer) != 1){
+                //config__update_allow_anonymous(db.config, in_buffer[0]);
+                //config__write(db.config);
+            //}
+            zmq_send(responder, response.data, response.len, 0);
+            free_payload(&response);
         }
     }
     zmq_close(responder);

@@ -36,58 +36,147 @@ Contributors:
 */
 
 
-#include "config.h"
-
-#include <cjson/cJSON.h>
-
-#include "civetweb/civetweb.h"
-
-#include <uthash.h>
-
 #include "mosquitto_broker.h"
 #include "mosquitto_broker_internal.h"
 
-#include "jwt/jwt.h"
-#include "jwt/jwt_helpers.h"
-
+#include <cjson/cJSON.h>
+#include <cbor.h>
 #include <string.h>
 #include <stdio.h>
 
-static bool api_authentication = true;
-
-int api_handler(struct mg_connection * conn, void * cbdata);
-int channel_get(struct mg_connection * conn);
-int channel_put(struct mg_connection * conn);
-int channel_post(struct mg_connection * conn);
-int channel_delete(struct mg_connection * conn);
-char * execute_command(char const * command);
+#include "zmq_api.h"
 
 
-int api_handler(struct mg_connection * conn, void * cbdata) {
-    const struct mg_request_info *req_info = mg_get_request_info(conn);
-    if (strcmp(req_info->request_method, "GET") == 0) {
-        return channel_get(conn);
-    } else if (strcmp(req_info->request_method, "PUT") == 0) {
-        return channel_put(conn);
-    } else if (strcmp(req_info->request_method, "POST") == 0) {
-        return channel_post(conn);
-    } else if (strcmp(req_info->request_method, "DELETE") == 0) {
-        return channel_delete(conn);
-    } else {
-        mg_send_http_error(conn, 405, "Method Not Allowed");
-        return 405;
-    }
-    return 0;
+struct payload_t make_payload_dynamic(void * data, size_t len){
+    return (struct payload_t){(unsigned char *)data, len, 1};
 }
 
 
-int channel_get(struct mg_connection * conn)
-{
-    int return_code = 200;
-    cJSON * pipeline_data;
-    const struct mg_request_info * req_info = mg_get_request_info(conn);
+struct payload_t make_payload_static(void * data, size_t len){
+    return (struct payload_t){(unsigned char *)data, len, 0};
+}
 
-    const char * last_segment = strrchr(req_info->request_uri, '/');
+
+char * mqbc_execute_command(char const * command);
+struct payload_t zmq_channel_get(char const * path, unsigned char const * payload, size_t payload_len);
+struct payload_t zmq_channel_put(char const * path, unsigned char const * payload, size_t payload_len);
+struct payload_t zmq_channel_post(char const * path, unsigned char const * payload, size_t payload_len);
+struct payload_t zmq_channel_delete(char const * path, unsigned char const * payload, size_t payload_len);
+
+
+void free_payload(struct payload_t * payload)
+{
+    if(payload->dynamic){
+        free(payload->data);
+        struct payload_t empty = {0};
+        *payload = empty;
+    }
+}
+
+
+struct payload_t describe_error(char const * descr){
+    struct payload_t description = {0};
+    if(descr != NULL){
+        size_t len = strlen(descr);
+        description.data = malloc(len);
+        description.dynamic = 1;
+        memcpy(description.data, descr, len);
+        description.len = len;
+    }else {
+        description.data = (unsigned char *)"Error";
+        description.len = 5;
+        description.dynamic = 0;
+    }
+    return description;
+}
+
+
+struct payload_t execute_request(char const * method, char const * path, unsigned char const * payload, size_t payload_len){
+    printf("%s - %s\n", method, path);
+    if(strcmp(method, "GET") == 0 || strcmp(method, "get") == 0){
+        return zmq_channel_get(path, payload, payload_len);
+    }else if(strcmp(method, "PUT") == 0 || strcmp(method, "put") == 0){
+        return zmq_channel_put(path, payload, payload_len);
+    }else if(strcmp(method, "POST") == 0 || strcmp(method, "post") == 0){
+        return zmq_channel_post(path, payload, payload_len);
+    }else if(strcmp(method, "DELETE") == 0 || strcmp(method, "delete") == 0){
+        return zmq_channel_delete(path, payload, payload_len);
+    }else{
+        return describe_error("Unknown method");
+    }
+}
+
+
+struct payload_t zmq_api_handler(unsigned char * buffer, size_t len)
+{
+    struct cbor_load_result result;
+    cbor_item_t * request = cbor_load(buffer, len, &result);
+
+    if(request == NULL) return describe_error(NULL);
+    if(! cbor_isa_array(request)){
+        cbor_decref(&request);
+        return describe_error(NULL);
+    }
+
+    size_t array_size = cbor_array_size(request);
+    if(array_size < 2){
+        cbor_decref(&request);
+        return describe_error(NULL);
+    }
+    cbor_item_t ** items = cbor_array_handle(request);
+    // Retrieve method
+    cbor_item_t * item = items[0];
+    if(! cbor_isa_string(item)){
+        cbor_decref(&request);
+        return describe_error(NULL);
+    }
+    char method[20] = {0};
+    if(cbor_string_length(item) >= 20){
+        cbor_decref(&request);
+        return describe_error(NULL);
+    }
+    strncpy(method, (char *)cbor_string_handle(item), cbor_string_length(item));
+    // Retrieve path
+    item = items[1];
+    if(! cbor_isa_string(item)){
+        cbor_decref(&request);
+        return describe_error(NULL);
+    }
+    char path[200] = {0};
+    if(cbor_string_length(item) >= 200){
+        cbor_decref(&request);
+        return describe_error("Path longer than 200 bytes");
+    }
+    strncpy(path, (char *)cbor_string_handle(item), cbor_string_length(item));
+    // Retrieve payload
+    unsigned char * payload = NULL;
+    size_t payload_len = 0;
+    if(array_size > 2){
+        item = items[2];
+        if(cbor_isa_bytestring(item)){
+            int d = cbor_bytestring_is_definite(item);
+            payload = cbor_bytestring_handle(item);
+            payload_len = cbor_bytestring_length(item);
+        }else if(cbor_isa_string(item)){
+            payload = cbor_string_handle(item);
+            payload_len = cbor_string_length(item);
+        }else{
+            cbor_decref(&request);
+            return describe_error(NULL);
+        }
+    }
+
+    struct payload_t response = execute_request(method, path, payload, payload_len);
+    cbor_decref(&request);
+    return response;
+}
+
+
+struct payload_t zmq_channel_get(char const * path, unsigned char const * payload, size_t payload_len)
+{
+    struct payload_t response = {0};
+    cJSON * pipeline_data;
+    const char * last_segment = strrchr(path, '/');
     if(last_segment && strlen(last_segment) > 1){
         char const * chanid = last_segment + 1;
         char command[200];
@@ -96,25 +185,21 @@ int channel_get(struct mg_connection * conn)
             sizeof(command),
             "{\"commands\":[{\"command\":\"getChannel\",\"chanid\":\"%s\"}]}", chanid
         );
-        char * result = execute_command(command);
+        char * result = mqbc_execute_command(command);
         cJSON * j_result = cJSON_Parse(result);
         cJSON * j_tmp = cJSON_GetArrayItem(cJSON_GetObjectItem(j_result, "responses") , 0);
         if(cJSON_GetObjectItem(j_tmp, "error")){
-            mg_send_http_error(conn, 404, "Not Found");
-            return_code = 404;
+            response = describe_error("Not Found");
         }else{
             cJSON * channel = cJSON_GetObjectItem(cJSON_GetObjectItem(j_tmp, "data"), "channel");
             char * payload = cJSON_PrintUnformatted(channel);
-            size_t payload_size = strlen(payload);
-            mg_send_http_ok(conn, "application/json", payload_size);
-            mg_write(conn, payload, payload_size);
-            free(payload);
+            response = make_payload_dynamic(payload, strlen(payload));
         }
         free(result);
         cJSON_Delete(j_result);
     }else{
         char * command = "{\"commands\":[{\"command\":\"listChannels\",\"verbose\":false}]}";
-        char * result = execute_command(command);
+        char * result = mqbc_execute_command(command);
         cJSON * j_result = cJSON_Parse(result);
         cJSON * channels = cJSON_GetObjectItem(
             cJSON_GetObjectItem(
@@ -124,29 +209,24 @@ int channel_get(struct mg_connection * conn)
             "channels"
         );
         char * payload = cJSON_PrintUnformatted(channels);
-        size_t payload_size = strlen(payload);
-        mg_send_http_ok(conn, "application/json", payload_size);
-        mg_write(conn, payload, payload_size);
+        response = make_payload_dynamic(payload, strlen(payload));
         free(result);
-        free(payload);
         cJSON_Delete(j_result);
     }
-    return return_code;
+    return response;
 }
 
 
-int channel_put(struct mg_connection * conn)
+struct payload_t zmq_channel_put(char const * path, unsigned char const * payload, size_t payload_len)
 {
-    int return_code = 200;
+    struct payload_t response = {0};
     cJSON * pipeline_data;
-    const struct mg_request_info * req_info = mg_get_request_info(conn);
 
-    const char * last_segment = strrchr(req_info->request_uri, '/');
+    const char * last_segment = strrchr(path, '/');
     if(last_segment && strlen(last_segment) > 1){
         char const * chanid = last_segment + 1;
         uint8_t buf[1024] = {0};
-        mg_read(conn, buf, sizeof(buf));  // TODO: Read until 0 or -1
-        cJSON * j_payload = cJSON_Parse(buf);
+        cJSON * j_payload = cJSON_ParseWithLength((char const *)payload, payload_len);
         if(j_payload){
             cJSON * j_wrapper = cJSON_CreateObject();
             cJSON * j_commands =  cJSON_AddArrayToObject(j_wrapper, "commands");
@@ -155,52 +235,37 @@ int channel_put(struct mg_connection * conn)
             cJSON_AddItemToArray(j_commands, j_payload);
             char * command = cJSON_PrintUnformatted(j_wrapper);
             mosquitto_log_printf(MOSQ_LOG_ERR, command);
-            char * result = execute_command(command);
+            char * result = mqbc_execute_command(command);
             free(command);
             free(j_wrapper);
             cJSON * j_result = cJSON_Parse(result);
             cJSON * j_tmp = cJSON_GetArrayItem(cJSON_GetObjectItem(j_result, "responses") , 0);
-
             cJSON * error = cJSON_GetObjectItem(j_tmp, "error");
             if(error){
                 char const * error_str = cJSON_GetStringValue(error);
-                if(strcmp("Channel not found", error_str) == 0){
-                    return_code = 404;
-                    mg_send_http_error(conn, return_code, error_str);
-                }else{
-                    return_code = 400;
-                    mg_send_http_error(conn, 400, error_str);
-                }
-            }else{
-                mg_send_http_ok(conn, "text/plain", 0);
+                response = describe_error(error_str);
             }
             free(result);
             cJSON_Delete(j_result);
         }else{
-            return_code = 400;
-            mg_send_http_error(conn, return_code, "Invalid Request");
+            response = describe_error("Invalid Request");
         }
     }else{
-        return_code = 400;
-        mg_send_http_error(conn, return_code, "Invalid Request");
-
+        response = describe_error("Invalid Request");
     }
-    return return_code;
+    return response;
 }
 
 
-int channel_post(struct mg_connection * conn)
+struct payload_t zmq_channel_post(char const * path, unsigned char const * payload, size_t payload_len)
 {
-    int return_code = 200;
+    struct payload_t response = {0};
     cJSON * pipeline_data;
-    const struct mg_request_info * req_info = mg_get_request_info(conn);
 
-    const char * last_segment = strrchr(req_info->request_uri, '/');
+    const char * last_segment = strrchr(path, '/');
     if(last_segment && strlen(last_segment) > 1){
         char const * chanid = last_segment + 1;
-        uint8_t buf[1024] = {0};
-        mg_read(conn, buf, sizeof(buf));  // TODO: Read until 0 or -1
-        cJSON * j_payload = cJSON_Parse(buf);
+        cJSON * j_payload = cJSON_ParseWithLength((char const *)payload, payload_len);
         if(j_payload){
             cJSON * j_wrapper = cJSON_CreateObject();
             cJSON * j_commands =  cJSON_AddArrayToObject(j_wrapper, "commands");
@@ -209,7 +274,7 @@ int channel_post(struct mg_connection * conn)
             cJSON_AddItemToArray(j_commands, j_payload);
             char * command = cJSON_PrintUnformatted(j_wrapper);
             mosquitto_log_printf(MOSQ_LOG_ERR, command);
-            char * result = execute_command(command);
+            char * result = mqbc_execute_command(command);
             free(command);
             free(j_wrapper);
             cJSON * j_result = cJSON_Parse(result);
@@ -217,32 +282,26 @@ int channel_post(struct mg_connection * conn)
             cJSON * error = cJSON_GetObjectItem(j_tmp, "error");
             if(error){
                 char const * error_str = cJSON_GetStringValue(error);
-                return_code = 400;
-                mg_send_http_error(conn, 400, error_str);
-            }else{
-                mg_send_http_ok(conn, "text/plain", 0);
+                response = describe_error(error_str);
             }
             free(result);
             cJSON_Delete(j_result);
         }else{
-            return_code = 400;
-            mg_send_http_error(conn, return_code, "Invalid Request");
+            response = describe_error("Invalid Request");
         }
     }else{
-        return_code = 400;
-        mg_send_http_error(conn, return_code, "Invalid Request");
+        response = describe_error("Invalid Request");
     }
-    return return_code;
+    return response;
 }
 
 
-int channel_delete(struct mg_connection * conn)
+struct payload_t zmq_channel_delete(char const * path, unsigned char const * payload, size_t payload_len)
 {
-    int return_code = 200;
+    struct payload_t response = {0};
     cJSON * pipeline_data;
-    const struct mg_request_info * req_info = mg_get_request_info(conn);
 
-    const char * last_segment = strrchr(req_info->request_uri, '/');
+    const char * last_segment = strrchr(path, '/');
     if(last_segment && strlen(last_segment) > 1){
         char const * chanid = last_segment + 1;
         cJSON * j_wrapper = cJSON_CreateObject();
@@ -255,8 +314,7 @@ int channel_delete(struct mg_connection * conn)
         cJSON_AddStringToObject(j_command, "command", "deleteChannels");
         cJSON_AddItemReferenceToArray(j_commands, j_command);
         char * command = cJSON_PrintUnformatted(j_wrapper);
-        mosquitto_log_printf(MOSQ_LOG_ERR, command);
-        char * result = execute_command(command);
+        char * result = mqbc_execute_command(command);
         free(command);
         free(j_wrapper);
         cJSON * j_result = cJSON_Parse(result);
@@ -264,22 +322,18 @@ int channel_delete(struct mg_connection * conn)
         cJSON * error = cJSON_GetObjectItem(j_tmp, "error");
         if(error){
             char const * error_str = cJSON_GetStringValue(error);
-            return_code = 400;
-            mg_send_http_error(conn, 400, error_str);
-        }else{
-            mg_send_http_ok(conn, "text/plain", 0);
+            response = describe_error(error_str);
         }
         free(result);
         cJSON_Delete(j_result);
     }else{
-        return_code = 400;
-        mg_send_http_error(conn, return_code, "Invalid Request");
+        response = describe_error("Invalid Request");
     }
-    return return_code;
+    return response;
 }
 
 
-char * execute_command(char const * command)
+char * mqbc_execute_command(char const * command)
 {
     struct mosquitto__callback *cb_found;
     struct mosquitto_evt_control event_data;
@@ -305,74 +359,4 @@ char * execute_command(char const * command)
         return response;
     }
     return NULL;
-}
-
-
-int auth_handler(struct mg_connection * conn, void * cbdata)
-{
-    if(!db.config->api_authentication){
-        return 1;
-    }
-    int authorized = 0;
-
-    point_t *public_key = (point_t *)cbdata;
-
-    char const * auth_token = mg_get_header(conn, "Authorization");  // TODO: Validate JWT Token
-    if(auth_token != NULL && strlen(auth_token) > 7){
-        const char *token = auth_token + 7;  // skip prefix (Bearer)
-
-        if (jwt_verify(token, public_key) == 1) {
-            authorized = 1;
-        }
-    }
-
-    if(authorized) {
-        return 1;
-    } else {
-        mg_send_http_error(conn, 401, "");
-        return 0;
-    }
-}
-
-
-struct mg_context * start_server()
-{
-    struct mg_context *ctx;
-    ecc_init();
-
-    char const * pem_public_key = read_file_content(db.config->http_api_pkey_file);
-    if(pem_public_key == NULL){
-        mosquitto_log_printf(MOSQ_LOG_ERR, "Failure reading http_api_pkey_file!");
-        return NULL;
-    }
-
-    point_t *public_key = malloc(sizeof(point_t));
-    public_key_from_pem(pem_public_key, public_key);
-    free((void*)pem_public_key);
-
-    mg_init_library(0);
-    char const * options[] = {"listening_ports", "8001", NULL};
-    ctx = mg_start(NULL, 0, options);
-
-    mg_set_request_handler(ctx, "/channel/", api_handler, NULL);
-    mg_set_auth_handler(ctx, "/**", auth_handler, public_key);
-
-    return ctx;
-}
-
-
-void stop_server(struct mg_context * ctx)
-{
-    if(ctx == NULL) return;
-
-    point_t *public_key = (point_t *)mg_get_user_data(ctx);
-    if(public_key){
-        free(public_key);
-    }
-
-    /* Stop the server */
-    mg_stop(ctx);
-
-    /* Un-initialize the library */
-    mg_exit_library();
 }

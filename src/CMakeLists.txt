@@ -72,6 +72,7 @@ set (MOSQ_SRCS
 	will_delay.c
 	../lib/will_mosq.c ../lib/will_mosq.h
 	zmq_listener.c
+	zmq_api.c
 )
 
 find_package(cJSON REQUIRED)
@@ -227,7 +228,7 @@ if (WITH_WEBSOCKETS)
 endif (WITH_WEBSOCKETS)
 
 add_executable(mosquitto ${MOSQ_SRCS})
-target_link_libraries(mosquitto ${MOSQ_LIBS} cjson)
+target_link_libraries(mosquitto ${MOSQ_LIBS} cjson cbor)
 
 if (WIN32)
 	set_target_properties(mosquitto PROPERTIES ENABLE_EXPORTS 1)
