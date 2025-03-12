@@ -135,7 +135,7 @@ struct dynsec__channel{
 	char * jwtkey;
 	char * text_name;
 	char * text_description;
-	bool disabled;
+	bool enabled;
 	unsigned long msg_received;
 	time_t msg_timestamp;
 };

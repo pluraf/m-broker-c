@@ -52,35 +52,6 @@ pthread_t g_zmq_th;
 
 struct payload_t handle_request(unsigned char * command, size_t command_len){
     return zmq_api_handler(command, command_len);
-/*
-    response[0] = 0;
-    if(strcmp(command, "api_version") == 0){
-        strcpy(response, MQBC_API_VERSION);
-        return 1;
-    }
-    if(strcmp(command, "status") == 0){
-        strcpy(response, "running");
-        return 1;
-    }
-    if(strcmp(command, "set_api_auth_on") == 0){
-        config__update_api_authentication(db.config, true);
-        if(config__write(db.config) == 0){
-            strcpy(response, "ok");
-        }else{
-            strcpy(response, "fail");
-        }
-        return 1;
-    }
-    if(strcmp(command, "set_api_auth_off") == 0){
-        config__update_api_authentication(db.config, false);
-        if(config__write(db.config) == 0){
-            strcpy(response, "ok");
-        }else{
-            strcpy(response, "fail");
-        }
-        return 1;
-    }
-    return 0;*/
 }
 
 
@@ -99,15 +70,15 @@ void * zmq_listener(void * arg){
         }
         if(num == 0){
             zmq_send(responder, &db.config->security_options.allow_anonymous, 1, 0);
+        }else if(num == 1){
+            config__update_allow_anonymous(db.config, in_buffer[0]);
+            config__write(db.config);
+            zmq_send(responder, NULL, 0, 0);
         }else{
             in_buffer[num] = '\0';
             struct payload_t response = handle_request(in_buffer, num);
-            //if(handle_request(in_buffer, num, out_buffer) != 1){
-                //config__update_allow_anonymous(db.config, in_buffer[0]);
-                //config__write(db.config);
-            //}
             zmq_send(responder, response.data, response.len, 0);
-            free_payload(&response);
+            free_payload(& response);
         }
     }
     zmq_close(responder);

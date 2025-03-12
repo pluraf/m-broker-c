@@ -365,9 +365,9 @@ int dynsec_channels__config_load(cJSON *tree)
                 continue;
             }
 
-            bool disabled;
-            if(json_get_bool(j_channel, "disabled", &disabled, false, false) == MOSQ_ERR_SUCCESS){
-                channel->disabled = disabled;
+            bool enabled;
+            if(json_get_bool(j_channel, "enabled", &enabled, false, false) == MOSQ_ERR_SUCCESS){
+                channel->enabled = enabled;
             }
 
 
@@ -481,7 +481,7 @@ static int dynsec__config_add_channels(cJSON *j_channels, struct dynsec__channel
                 || (channel->clientid && (cJSON_AddStringToObject(j_channel, "clientid", channel->clientid) == NULL))
                 || (channel->text_name && (cJSON_AddStringToObject(j_channel, "textname", channel->text_name) == NULL))
                 || (channel->text_description && (cJSON_AddStringToObject(j_channel, "textdescription", channel->text_description) == NULL))
-                || (channel->disabled && (cJSON_AddBoolToObject(j_channel, "disabled", true) == NULL))){
+                || (cJSON_AddBoolToObject(j_channel, "enabled", channel->enabled) == NULL)){
             return 1;
         }
 
@@ -637,7 +637,7 @@ int dynsec_channels__process_create(cJSON *j_responses, struct mosquitto *contex
         }
     }
 
-    json_get_bool(command, "disabled", & channel->disabled, false, false);
+    json_get_bool(command, "enabled", & channel->enabled, false, false);
 
     // Time to check for uniqueness
     // (must add user before groups, otherwise adding groups will fail)
@@ -814,7 +814,7 @@ int dynsec_channels__process_disable(cJSON *j_responses, struct mosquitto *conte
         return MOSQ_ERR_SUCCESS;
     }
 
-    channel->disabled = true;
+    channel->enabled = false;
 
     dynsec_channels__kick_channels(channel);
 
@@ -851,7 +851,7 @@ int dynsec_channels__process_enable(cJSON *j_responses, struct mosquitto *contex
         return MOSQ_ERR_SUCCESS;
     }
 
-    channel->disabled = false;
+    channel->enabled = true;
 
     dynsec__config_save();
     dynsec__command_reply(j_responses, context, "enableChannel", NULL, correlation_data);
@@ -1058,7 +1058,8 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
     // We need to check uniqueness of clientid and username
     if(dynsec_channels__add_check_uniqueness(NULL, clientid, username, chanid) != MOSQ_ERR_SUCCESS){
         dynsec__command_reply(j_responses, context, "modifyChannel", "Connector will become ambiguous", correlation_data);
-        return MOSQ_ERR_INVAL;
+        rc = MOSQ_ERR_INVAL;
+        goto error;
     }
 
     if(clientid != NULL){
@@ -1089,12 +1090,13 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
         }
     }
 
-    json_get_bool(command, "disabled", & channel->disabled, false, false);
+    json_get_bool(command, "enabled", & channel->enabled, false, false);
 
     if(json_get_string(command, "secret", & secret, false) == MOSQ_ERR_SUCCESS){
         if(json_get_string(command, "authtype", & authtype, false) != MOSQ_ERR_SUCCESS){
             dynsec__command_reply(j_responses, context, "modifyChannel", "Invalid/missing authtype", correlation_data);
-            return MOSQ_ERR_INVAL;
+            rc = MOSQ_ERR_INVAL;
+            goto error;
         }
         have_secret = true;
     }
@@ -1242,6 +1244,7 @@ int dynsec_channels__process_modify(cJSON *j_responses, struct mosquitto *contex
     return MOSQ_ERR_SUCCESS;
 error:
     mosquitto_free(clientid);
+    mosquitto_free(username);
     mosquitto_free(text_name);
     mosquitto_free(text_description);
     dynsec_rolelist__cleanup(&rolelist);
@@ -1274,13 +1277,14 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
         }
 
         if((channel->chanid && cJSON_AddStringToObject(j_channel, "id", channel->chanid) == NULL)
+                || (channel->authtype && cJSON_AddStringToObject(j_channel, "type", "mqtt") == NULL)
                 || (channel->authtype && cJSON_AddStringToObject(j_channel, "authtype", channel->authtype) == NULL)
                 || (channel->username && (cJSON_AddStringToObject(j_channel, "username", channel->username) == NULL))
                 || (channel->clientid && (cJSON_AddStringToObject(j_channel, "clientid", channel->clientid) == NULL))
                 || (channel->jwtkey && (cJSON_AddStringToObject(j_channel, "jwtkey", channel->jwtkey) == NULL))
                 || (channel->text_name && (cJSON_AddStringToObject(j_channel, "textname", channel->text_name) == NULL))
                 || (channel->text_description && (cJSON_AddStringToObject(j_channel, "textdescription", channel->text_description) == NULL))
-                || (cJSON_AddStringToObject(j_channel, "state", channel->disabled ? "DISABLED" : "ENABLED") == NULL)
+                || (cJSON_AddStringToObject(j_channel, "state", channel->enabled ? "ENABLED": "DISABLED") == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_received", channel->msg_received) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_timestamp", channel->msg_timestamp) == NULL)){
             cJSON_Delete(j_channel);
@@ -1306,7 +1310,8 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
             return NULL;
         }
         if((channel->chanid && cJSON_AddStringToObject(j_channel, "id", channel->chanid) == NULL)
-                || (cJSON_AddStringToObject(j_channel, "state", channel->disabled ? "DISABLED" : "ENABLED") == NULL)
+                || (channel->authtype && cJSON_AddStringToObject(j_channel, "type", "mqtt") == NULL)
+                || (cJSON_AddStringToObject(j_channel, "state", channel->enabled ? "ENABLED" : "DISABLED") == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_received", channel->msg_received) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_timestamp", channel->msg_timestamp) == NULL)){
             cJSON_Delete(j_channel);

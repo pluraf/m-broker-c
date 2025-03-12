@@ -253,7 +253,7 @@ int dynsec_auth__basic_auth_callback(int event, void *event_data, void *userdata
     channel = dynsec_channels__find(clientid, ed->username);
 
     if(channel){
-        if(channel->disabled) return MOSQ_ERR_AUTH;
+        if(channel->enabled) return MOSQ_ERR_AUTH;
         return dynsec_auth__authenticate(channel, ed);
     }
 

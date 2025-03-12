@@ -44,7 +44,12 @@ Contributors:
 #include <string.h>
 #include <stdio.h>
 
+#include "API_VERSION.h"
 #include "zmq_api.h"
+
+
+struct payload_t zmq_legacy_get(char const * path);
+struct payload_t zmq_legacy_put(char const * path);
 
 
 struct payload_t make_payload_dynamic(void * data, size_t len){
@@ -94,9 +99,17 @@ struct payload_t describe_error(char const * descr){
 struct payload_t execute_request(char const * method, char const * path, unsigned char const * payload, size_t payload_len){
     printf("%s - %s\n", method, path);
     if(strcmp(method, "GET") == 0 || strcmp(method, "get") == 0){
-        return zmq_channel_get(path, payload, payload_len);
+        if(strncmp(path, "channel", 7) == 0){
+            return zmq_channel_get(path, payload, payload_len);
+        }else{
+            return zmq_legacy_get(path);
+        }
     }else if(strcmp(method, "PUT") == 0 || strcmp(method, "put") == 0){
-        return zmq_channel_put(path, payload, payload_len);
+        if(strncmp(path, "channel", 7) == 0){
+            return zmq_channel_put(path, payload, payload_len);
+        }else{
+            return zmq_legacy_put(path);
+        }
     }else if(strcmp(method, "POST") == 0 || strcmp(method, "post") == 0){
         return zmq_channel_post(path, payload, payload_len);
     }else if(strcmp(method, "DELETE") == 0 || strcmp(method, "delete") == 0){
@@ -169,6 +182,40 @@ struct payload_t zmq_api_handler(unsigned char * buffer, size_t len)
     struct payload_t response = execute_request(method, path, payload, payload_len);
     cbor_decref(&request);
     return response;
+}
+
+
+struct payload_t zmq_legacy_get(char const * path)
+{
+    if(strcmp(path, "api_version") == 0){
+        return make_payload_static(MQBC_API_VERSION, strlen(MQBC_API_VERSION));
+    }
+    if(strcmp(path, "status") == 0){
+        return make_payload_static("running", strlen("running"));
+    }
+    return describe_error(NULL);
+}
+
+
+struct payload_t zmq_legacy_put(char const * path)
+{
+    if(strcmp(path, "set_api_auth_on") == 0){
+        config__update_api_authentication(db.config, true);
+        if(config__write(db.config) == 0){
+            return make_payload_static("ok", strlen("ok"));
+        }else{
+            return make_payload_static("ok", strlen("fail"));
+        }
+    }
+    if(strcmp(path, "set_api_auth_off") == 0){
+        config__update_api_authentication(db.config, false);
+        if(config__write(db.config) == 0){
+            return make_payload_static("ok", strlen("ok"));
+        }else{
+            return make_payload_static("ok", strlen("fail"));
+        }
+    }
+    return describe_error(NULL);
 }
 
 
