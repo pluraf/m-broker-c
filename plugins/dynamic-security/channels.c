@@ -370,11 +370,9 @@ int dynsec_channels__config_load(cJSON *tree)
                 channel->enabled = enabled;
             }
 
-
-
             // Password
             if(strcmp(channel->authtype, MQTT_AUTH_PASSWORD) == 0
-                    && json_get_object(j_channel, "secret", &j_password, true) == MOSQ_ERR_SUCCESS){
+                    && json_get_object(j_channel, "password", & j_password, true) == MOSQ_ERR_SUCCESS){
                 char *salt, *password;
                 int iterations;
                 json_get_string(j_password, "salt", &salt, false);
