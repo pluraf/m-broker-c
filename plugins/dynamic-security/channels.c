@@ -1284,7 +1284,8 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
                 || (channel->jwtkey && (cJSON_AddStringToObject(j_channel, "jwtkey", channel->jwtkey) == NULL))
                 || (channel->text_name && (cJSON_AddStringToObject(j_channel, "textname", channel->text_name) == NULL))
                 || (channel->text_description && (cJSON_AddStringToObject(j_channel, "textdescription", channel->text_description) == NULL))
-                || (cJSON_AddStringToObject(j_channel, "state", channel->enabled ? "ENABLED": "DISABLED") == NULL)
+                || (cJSON_AddStringToObject(j_channel, "state", "CONFIGURED") == NULL)
+                || (cJSON_AddBoolToObject(j_channel, "enabled", channel->enabled) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_received", channel->msg_received) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_timestamp", channel->msg_timestamp) == NULL)){
             cJSON_Delete(j_channel);
@@ -1311,7 +1312,8 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
         }
         if((channel->chanid && cJSON_AddStringToObject(j_channel, "id", channel->chanid) == NULL)
                 || (channel->authtype && cJSON_AddStringToObject(j_channel, "type", "mqtt") == NULL)
-                || (cJSON_AddStringToObject(j_channel, "state", channel->enabled ? "ENABLED" : "DISABLED") == NULL)
+                || (cJSON_AddStringToObject(j_channel, "state", "CONFIGURED") == NULL)
+                || (cJSON_AddBoolToObject(j_channel, "enabled", channel->enabled) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_received", channel->msg_received) == NULL)
                 || (cJSON_AddNumberToObject(j_channel, "msg_timestamp", channel->msg_timestamp) == NULL)){
             cJSON_Delete(j_channel);
