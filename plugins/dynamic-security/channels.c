@@ -352,12 +352,6 @@ int dynsec_channels__config_load(cJSON *tree)
                 }
             }
 
-            // Time to check for uniqueness
-            if(dynsec_channels__add(channel) != MOSQ_ERR_SUCCESS){
-                channel__unallocate_item(channel);
-                continue;
-            }
-
             // authtype
             channel->authtype = mosquitto_strdup(authtype);
             if(channel->authtype == NULL){
@@ -450,6 +444,12 @@ int dynsec_channels__config_load(cJSON *tree)
                         }
                     }
                 }
+            }
+
+            // Time to add channel
+            if(dynsec_channels__add(channel) != MOSQ_ERR_SUCCESS){
+                channel__unallocate_item(channel);
+                continue;
             }
         }
     }
