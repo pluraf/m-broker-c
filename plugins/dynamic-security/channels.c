@@ -1290,6 +1290,51 @@ static cJSON *add_channel_to_json(struct dynsec__channel * channel, bool verbose
             return NULL;
         }
 
+        // Add ports
+        cJSON * port1 = cJSON_CreateObject();
+        if(port1 == NULL){
+            cJSON_Delete(j_channel);
+            return NULL;
+        }
+        if(cJSON_AddNumberToObject(port1, "port", 1883) == NULL){
+            cJSON_Delete(port1);
+            cJSON_Delete(j_channel);
+            return NULL;
+        }
+        if(cJSON_AddStringToObject(port1, "descr", "TCP") == NULL){
+            cJSON_Delete(port1);
+            cJSON_Delete(j_channel);
+            return NULL;
+        }
+        cJSON * port2 = cJSON_CreateObject();
+        if(port2 == NULL){
+            return NULL;
+        }
+        if(cJSON_AddNumberToObject(port2, "port", 8883) == NULL){
+            cJSON_Delete(port1);
+            cJSON_Delete(port2);
+            cJSON_Delete(j_channel);
+            return NULL;
+        }
+        if(cJSON_AddStringToObject(port2, "descr", "TLS") == NULL){
+            cJSON_Delete(port1);
+            cJSON_Delete(port2);
+            cJSON_Delete(j_channel);
+            return NULL;
+        }
+
+        cJSON * ports = cJSON_CreateArray();
+        if(ports == NULL){
+            cJSON_Delete(port1);
+            cJSON_Delete(port2);
+            cJSON_Delete(j_channel);
+            return NULL;
+        }
+        cJSON_AddItemToArray(ports, port1);
+        cJSON_AddItemToArray(ports, port2);
+        cJSON_AddItemToObject(j_channel, "ports", ports);
+
+        // -----
         j_roles = dynsec_rolelist__all_to_json(channel->rolelist);
         if(j_roles == NULL){
             cJSON_Delete(j_channel);
